@@ -1,3 +1,12 @@
+# Jetbrains
+.idea/*
+cmake-build-*/*
+CMakeLists.txt
+
+# Xmake
+.xmake/*
+build/*
+
 # Prerequisites
 *.d
 
