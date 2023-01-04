@@ -5,6 +5,7 @@
 #include <igl/per_corner_normals.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <fmt/format.h>
+#include "property/face-normal.h"
 
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
@@ -34,6 +35,12 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
         case '5':
             viewer.data().set_normals(N_corners);
             return true;
+        case '6': {
+            auto calculator = meshlib::FaceNormalCalculator();
+            N_faces = calculator.Calculate(V, F);
+            viewer.data().set_normals(N_faces);
+            return true;
+        }
         default: break;
     }
     return false;
@@ -57,7 +64,6 @@ int main(int argc, char *argv[])
     igl::per_corner_normals(V, F, 20, N_corners);
 
     igl::opengl::glfw::Viewer viewer;
-    viewer.data().shininess
 
     viewer.data().set_mesh(V, F);
     viewer.callback_key_down = &key_down;
