@@ -5,11 +5,11 @@ namespace meshlib {
 
 class FaceNormalCalculator {
 public:
-    Eigen::Matrix3Xd Calculate(const Eigen::Matrix3Xd& V, const Eigen::Matrix3Xi& F)
+    Eigen::MatrixXd Calculate(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F)
     {
         Eigen::Vector3d invalidNormal(0, 0, 0);
 
-        Eigen::Matrix3Xd N;
+        Eigen::MatrixXd N;
         N.resize(F.rows(), 3);
 
         const size_t fCount = F.rows();
