@@ -18,7 +18,7 @@ public:
             const Eigen::Vector3d p1 = V.row(F(f, 1));
             const Eigen::Vector3d p2 = V.row(F(f, 2));
 
-            auto n0 = (p1 - p0).cross(p2 - p0);
+            Eigen::Vector3d n0 = (p1 - p0).cross(p2 - p0);
             n0 = n0 / n0.norm();
 
             N.row(f) = n0;

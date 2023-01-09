@@ -26,3 +26,14 @@ target("01-geometry-property-visualization")
     end
     add_includedirs("src/")
     add_deps("meshlib")
+
+target("02-parametrization-tutte")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/param-tutte/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
+    add_includedirs("src/")
+    add_deps("meshlib")
