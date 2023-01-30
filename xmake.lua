@@ -37,3 +37,14 @@ target("02-parametrization-tutte")
     end
     add_includedirs("src/")
     add_deps("meshlib")
+
+target("03-decimation")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/decimation/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
+    add_includedirs("src/")
+    add_deps("meshlib")
