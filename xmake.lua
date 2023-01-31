@@ -9,6 +9,7 @@ add_requires("libigl", {configs = {imgui=true}, debug=enable_debug})
 add_requires("fmt", {debug=enable_debug, header_only=true, system=false})
 add_requires("glad", {debug=enable_debug, system=false})
 add_requires("eigen", {debug=enable_debug, system=false})
+add_requires("openmesh", {debug=enable_debug, system=false})
 
 target("meshlib")
     set_languages("c++17")
@@ -43,6 +44,17 @@ target("03-decimation")
     set_kind("binary")
     add_files("apps/decimation/*.cc")
     add_packages("libigl", "glad", "eigen", "fmt")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
+    add_includedirs("src/")
+    add_deps("meshlib")
+
+target("04-openmesh")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/openmesh/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt", "openmesh")
     if (enable_debug) then
         set_runtimes("MT")
     end

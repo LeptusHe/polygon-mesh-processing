@@ -1,3 +1,6 @@
+# Project Files
+data/result/*
+
 # Jetbrains
 .idea/*
 cmake-build-*/*

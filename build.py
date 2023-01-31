@@ -5,6 +5,10 @@ def generate_cmakelists():
     cmd = "xmake project -k cmakelists"
     os.system(cmd)
 
+def set_mode(mode):
+    cmd = "xmake config --mode={}".format(mode)
+    os.system(cmd)
+
 
 def build():
     cmd = "xmake -b"
