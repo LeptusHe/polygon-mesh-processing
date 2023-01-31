@@ -1,5 +1,6 @@
 import os
 
+
 def generate_cmakelists():
     cmd = "xmake project -k cmakelists"
     os.system(cmd)
