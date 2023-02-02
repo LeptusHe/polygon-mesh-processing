@@ -60,3 +60,25 @@ target("04-openmesh")
     end
     add_includedirs("src/")
     add_deps("meshlib")
+
+target("05-k-means")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/k-means/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt", "openmesh")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
+    add_includedirs("src/")
+    add_deps("meshlib")
+
+target("06-iterative-cluster")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/iterative-cluster/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt", "openmesh")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
+    add_includedirs("src/")
+    add_deps("meshlib")
