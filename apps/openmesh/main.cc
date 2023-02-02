@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <Eigen/Core>
+#include <igl/opengl/glfw/Viewer.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
 
     for (int vid = 0; vid < mesh.n_vertices() - 1; ++ vid) {
         auto vertHandle = mesh.vertex_handle(vid);
-        mesh.delete_vertex(vertHandle, false);
+        //mesh.delete_vertex(vertHandle, false);
     }
     PrintMeshInfo(mesh, "after delete vertex");
 
@@ -63,6 +64,38 @@ int main(int argc, char *argv[])
         std::cerr << fmt::format("failed to write mesh because [{0}]", e.what()) << std::endl;
         return 1;
     }
+
+    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+
+    for (auto vertHandle : mesh.vertices()) {
+        auto vert = mesh.point(vertHandle);
+        //std::cout << fmt::format("vert: [{0}, {1}, {2}]", vert[0], vert[1], vert[2]) << std::endl;
+        V.row(vertHandle.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+
+        if (!vertHandle.is_manifold()) {
+            C.row(vertHandle.idx()) = Eigen::Vector3d(1, 0, 0);
+        } else {
+            C.row(vertHandle.idx()) = Eigen::Vector3d(0.5, 0.5f, 0.5f);
+        }
+    }
+
+
+    for (auto faceHandle : mesh.faces()) {
+        auto fvIter = mesh.cfv_iter(faceHandle);
+        for (int i = 0; i < 3; ++ i) {
+            F(faceHandle.idx(), i) = fvIter->idx();
+            //std::cout << fmt::format("face: [{0}, {1}, {2}]", faceHandle.idx(), i, fvIter->idx()) << std::endl;
+            ++ fvIter;
+        }
+    }
+
+
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_mesh(V, F);
+    viewer.data().set_colors(C);
+    viewer.launch();
 
     return 0;
 }
