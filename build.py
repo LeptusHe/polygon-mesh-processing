@@ -15,6 +15,12 @@ def build():
     os.system(cmd)
 
 
+def rebuild():
+    cmd = "xmake -r"
+    os.system(cmd)
+
+
 if __name__ == "__main__":
-    build()
+    set_mode("debug")
+    rebuild()
     generate_cmakelists()

@@ -1,4 +1,4 @@
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug")
 
 add_cxxflags("/bigobj")
 
@@ -14,8 +14,11 @@ add_requires("openmesh", {debug=enable_debug, system=false})
 target("meshlib")
     set_languages("c++17")
     set_kind("static")
-    add_files("src/property/*.cc")
-    add_packages("libigl", "glad", "eigen", "fmt")
+    add_files("src/*.cc")
+    add_packages("libigl", "glad", "eigen", "fmt", "openmesh")
+    if (enable_debug) then
+        set_runtimes("MT")
+    end
 
 target("01-geometry-property-visualization")
     set_languages("c++17")
