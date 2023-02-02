@@ -128,7 +128,7 @@ std::vector<TexMat> GenerateGridTex(Eigen::Vector3d colorA, Eigen::Vector3d colo
 int main(int argc, char *argv[])
 {
     auto path = argc > 1 ? argv[1] : "data/beetle.obj";
-    //auto path = argc > 1 ? argv[1] : "data/test.obj";
+    //auto path = argc > 1 ? argv[1] : "data/quad.obj";
     if (!igl::read_triangle_mesh(path, V, F)) {
         std::cout << fmt::format("failed to load mesh: [{0}]", path);
         return -1;

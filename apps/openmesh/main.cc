@@ -22,7 +22,7 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
 
 int main(int argc, char *argv[])
 {
-    auto path = argc > 1 ? argv[1] : "data/test.obj";
+    auto path = argc > 1 ? argv[1] : "data/quad.obj";
 
     Mesh mesh;
     OpenMesh::IO::Options opt;
