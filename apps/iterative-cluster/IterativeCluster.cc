@@ -34,6 +34,8 @@ void IterativeCluster::Run(int k, float lambda, int maxIter)
     while (restIterCnt > 0) {
         m_prevSeeds = m_seeds;
 
+        std::cout << "iteration: " << maxIter - restIterCnt << "\n\n" << std::endl;
+
         auto lastFace = RegionGrow();
         UpdateClusterCenters();
         if (IsConverged())
@@ -66,10 +68,17 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
     std::vector<PriorityQueue> queues(m_seeds.size());
     ClearClusterProp();
 
+    std::vector<OpenMesh::FProp<bool>> visitedProps;
+    for (int i = 0; i < m_seeds.size(); ++ i) {
+        visitedProps.emplace_back(OpenMesh::FProp<bool>(m_mesh));
+    }
+
     for (int i = 0; i < m_seeds.size(); ++ i) {
         auto seed = m_seeds[i];
         m_clusterProp[seed] = i;
         queues[i].emplace(0.0f, seed);
+
+        visitedProps[i][seed] = true;
     }
     m_clusterNormals = std::vector<Mesh::Normal>(m_seeds.size(), Mesh::Normal(0, 0, 0));
 
@@ -85,12 +94,25 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
             if (queue.empty())
                 continue;
 
-            auto item = queue.top();
-            queue.pop();
+            Item item = queue.top();
+            while (true) {
+                item = queue.top();
+                queue.pop();
+
+                if (m_clusterProp[item.handle] == clusterId || m_clusterProp[item.handle] == kInvalidClusterId)
+                    break;
+
+                if (queue.empty())
+                    break;
+            }
 
             auto face = item.handle;
             lastFace = face;
             m_clusterProp[face] = clusterId;
+
+            if (clusterId == 0) {
+                //std::cout << "f: " << face.idx() << " cost: " << item.cost << std::endl;
+            }
 
             // Note：更新chart的法线
             m_clusterNormals[clusterId] += m_mesh.normal(face);
@@ -100,8 +122,12 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
                 if (m_clusterProp[fh] != kInvalidClusterId)
                     continue;
 
+                if (visitedProps[clusterId][fh])
+                    continue;
+
                 auto cost = CalculateCost(m_clusterNormals[clusterId], face, fh);
                 queue.emplace(cost, fh);
+                visitedProps[clusterId][fh] = true;
             }
 
             notEmpty = true;

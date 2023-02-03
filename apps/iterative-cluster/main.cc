@@ -69,8 +69,8 @@ int main(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int clusterCnt = 3;
-    int maxIteration = 1000;
+    int clusterCnt = 5;
+    int maxIteration = 100;
     cluster.Run(clusterCnt, 1, maxIteration);
 
     //cluster.InitSeed();
@@ -92,9 +92,9 @@ int main(int argc, char *argv[])
             auto clusterId = clusterProp[faceHandle];
             C.row(faceHandle.idx()) = colors[clusterId];
 
-            auto pos = mesh.calc_face_centroid(faceHandle);
-            auto c = Eigen::Vector3d{pos[0], pos[1], pos[2]};
-            viewer.data().add_label(c, fmt::format("{}", clusterId));
+            //auto pos = mesh.calc_face_centroid(faceHandle);
+            //auto c = Eigen::Vector3d{pos[0], pos[1], pos[2]};
+            //viewer.data().add_label(c, fmt::format("{}", clusterId));
         }
     };
 
@@ -108,10 +108,18 @@ int main(int argc, char *argv[])
         }
     };
 
+    viewer.callback_key_down = [&](igl::opengl::glfw::Viewer& viewer, unsigned char key, int mod) {
+        if (key == 'N') {
+            maxIteration += 1;
+            cluster.Run(clusterCnt, 1, maxIteration);
+            set_color_to_mesh();
+        }
+        return false;
+    };
+
     set_color_to_mesh();
 
-    viewer.data().label_size = 2;
-    viewer.data().show_custom_labels = true;
+    //viewer.data().show_custom_labels = true;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     viewer.launch();
