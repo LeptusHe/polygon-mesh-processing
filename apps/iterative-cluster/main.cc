@@ -3,6 +3,10 @@
 #include <fmt/format.h>
 #include <Eigen/Core>
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
+#include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
+#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
+#include <imgui.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include "IterativeCluster.h"
@@ -47,7 +51,7 @@ int main(int argc, char *argv[])
 
     Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
     Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
-    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_faces(), 3);
 
     for (auto vertHandle : mesh.vertices()) {
         auto vert = mesh.point(vertHandle);
@@ -65,23 +69,49 @@ int main(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int clusterCnt = 10;
-    cluster.Run(clusterCnt, 1, 1000);
+    int clusterCnt = 3;
+    int maxIteration = 1000;
+    cluster.Run(clusterCnt, 1, maxIteration);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();
 
+    igl::opengl::glfw::Viewer viewer;
+
+    igl::opengl::glfw::imgui::ImGuiPlugin plugin;
+    viewer.plugins.push_back(&plugin);
+
+    igl::opengl::glfw::imgui::ImGuiMenu menu;
+    plugin.widgets.push_back(&menu);
+
     ColorSetGenerator colorSetGenerator(clusterCnt);
     auto colors = colorSetGenerator.GetColorSet();
 
-    for (auto faceHandle : mesh.faces()) {
-        auto clusterId = clusterProp[faceHandle];
-        for (auto fvIter = mesh.cfv_iter(faceHandle); fvIter.is_valid(); ++ fvIter ) {
-            C.row(fvIter->idx()) = colors[clusterId];
-        }
-    }
+    auto set_color_to_mesh = [&]() { ;
+        for (auto faceHandle: mesh.faces()) {
+            auto clusterId = clusterProp[faceHandle];
+            C.row(faceHandle.idx()) = colors[clusterId];
 
-    igl::opengl::glfw::Viewer viewer;
+            auto pos = mesh.calc_face_centroid(faceHandle);
+            auto c = Eigen::Vector3d{pos[0], pos[1], pos[2]};
+            viewer.data().add_label(c, fmt::format("{}", clusterId));
+        }
+    };
+
+
+    menu.callback_draw_viewer_menu = [&]() {
+        menu.draw_viewer_menu();
+
+        if (ImGui::InputInt("max iteration", &maxIteration)) {
+            cluster.Run(clusterCnt, 1, maxIteration);
+            set_color_to_mesh();
+        }
+    };
+
+    set_color_to_mesh();
+
+    viewer.data().label_size = 2;
+    viewer.data().show_custom_labels = true;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     viewer.launch();

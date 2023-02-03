@@ -51,9 +51,8 @@ void IterativeCluster::Run(int k, float lambda, int maxIter)
     if (restIterCnt == 0) {
         std::cout << "IterativeCluster: reach max iteration count: " << maxIter << std::endl;
     } else {
-        std::cout << "IterativeCluster: converge in " << maxIter - restIterCnt << "iteration"  << std::endl;
+        std::cout << "IterativeCluster: converge in " << maxIter - restIterCnt << " iteration"  << std::endl;
     }
-
 }
 
 void IterativeCluster::InitSeed()
@@ -72,6 +71,7 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
         m_clusterProp[seed] = i;
         queues[i].emplace(0.0f, seed);
     }
+    m_clusterNormals = std::vector<Mesh::Normal>(m_seeds.size(), Mesh::Normal(0, 0, 0));
 
     Mesh::FaceHandle lastFace;
 
@@ -92,11 +92,15 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
             lastFace = face;
             m_clusterProp[face] = clusterId;
 
+            // Note：更新chart的法线
+            m_clusterNormals[clusterId] += m_mesh.normal(face);
+            m_clusterNormals[clusterId].normalize();
+
             for (auto fh : m_mesh.ff_range(face)) {
                 if (m_clusterProp[fh] != kInvalidClusterId)
                     continue;
 
-                auto cost = CalculateCost(face, fh);
+                auto cost = CalculateCost(m_clusterNormals[clusterId], face, fh);
                 queue.emplace(cost, fh);
             }
 
@@ -110,16 +114,14 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
 }
 
 
-float IterativeCluster::CalculateCost(const Mesh::FaceHandle& lhs, const Mesh::FaceHandle& rhs)
+float IterativeCluster::CalculateCost(const Mesh::Normal& chartNormal, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace)
 {
-    auto l = m_mesh.calc_face_centroid(lhs);
-    auto r = m_mesh.calc_face_centroid(rhs);
-
+    auto l = m_mesh.calc_face_centroid(oldFace);
+    auto r = m_mesh.calc_face_centroid(newFace);
     auto d = (l - r).length();
 
-    auto ln = m_mesh.normal(lhs).normalized();
-    auto rn = m_mesh.normal(rhs).normalized();
-    auto n = ln.dot(rn);
+    auto rn = m_mesh.normal(newFace).normalized();
+    auto n = chartNormal.dot(rn);
 
     return (m_lambda - n) * d;
 }

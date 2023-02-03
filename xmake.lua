@@ -5,7 +5,10 @@ add_cxxflags("/bigobj")
 enable_debug = is_mode("debug")
 print("enable debug:", enable_debug)
 
-add_requires("libigl", {configs = {imgui=true}, debug=enable_debug})
+imgui = "imgui v1.86"
+
+add_requires("libigl", {configs = {imgui = true}, debug=enable_debug})
+add_requires(imgui, {debug=enable_debug, system=false})
 add_requires("fmt", {debug=enable_debug, header_only=true, system=false})
 add_requires("glad", {debug=enable_debug, system=false})
 add_requires("eigen", {debug=enable_debug, system=false})
@@ -79,7 +82,7 @@ target("06-iterative-cluster")
     set_languages("c++17")
     set_kind("binary")
     add_files("apps/iterative-cluster/*.cc")
-    add_packages("libigl", "glad", "eigen", "fmt", "openmesh")
+    add_packages("libigl", "glad", "eigen", "fmt", "openmesh", imgui)
     if (enable_debug) then
         set_runtimes("MT")
     end

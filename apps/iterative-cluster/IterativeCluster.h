@@ -13,7 +13,7 @@ public:
     IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp);
     void Run(int k, float lambda, int maxIter = 100);
     Mesh::FaceHandle RegionGrow();
-    float CalculateCost(const Mesh::FaceHandle& lhs, const Mesh::FaceHandle& rhs);
+    float CalculateCost(const Mesh::Normal& chartNormal, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace);
     void InitSeed();
     void ClearClusterProp();
     void UpdateClusterCenters();
@@ -26,7 +26,9 @@ private:
     Mesh& m_mesh;
     float m_lambda = 1;
     int m_clusterCount = 0;
+
     OpenMesh::FProp<int>& m_clusterProp;
+    std::vector<Mesh::Normal> m_clusterNormals;
 
     std::vector<Mesh::FaceHandle> m_prevSeeds;
     std::vector<Mesh::FaceHandle> m_seeds;
