@@ -65,8 +65,8 @@ int main(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int clusterCnt = 1;
-    cluster.Run(clusterCnt, 100);
+    int clusterCnt = 10;
+    cluster.Run(clusterCnt, 1, 1000);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
         auto clusterId = clusterProp[faceHandle];
         for (auto fvIter = mesh.cfv_iter(faceHandle); fvIter.is_valid(); ++ fvIter ) {
             C.row(fvIter->idx()) = colors[clusterId];
-        };
+        }
     }
 
     igl::opengl::glfw::Viewer viewer;
