@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     KMeans kMeans(mesh, clusterProp);
 
     int clusterCnt = 10;
-    kMeans.Run(clusterCnt, 100);
+    kMeans.Run(clusterCnt, 1000);
 
     ColorSetGenerator colorSetGenerator(clusterCnt);
     auto colors = colorSetGenerator.GetColorSet();
