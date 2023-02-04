@@ -5,9 +5,17 @@ struct Item {
 public:
     float cost;
     Mesh::FaceHandle handle;
+    int clusterId = -1;
+    bool seed = false;
 
     Item(float cost, Mesh::FaceHandle handle)
         : cost(cost), handle(handle) {}
+
+    Item(float cost, Mesh::FaceHandle handle, int clusterId)
+        : cost(cost), handle(handle), clusterId(clusterId) {}
+
+    Item(float cost, Mesh::FaceHandle handle, int clusterId, bool seed)
+            : cost(cost), handle(handle), clusterId(clusterId), seed(seed) {}
 };
 
 struct ItemComp {
@@ -26,7 +34,7 @@ IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp
 void IterativeCluster::Run(int k, float lambda, int maxIter)
 {
     m_clusterCount = k;
-    m_lambda = std::clamp(lambda, 0.0f, 1.0f);
+    m_lambda = std::max(1.0f, lambda);
 
     InitSeed();
 
@@ -36,8 +44,10 @@ void IterativeCluster::Run(int k, float lambda, int maxIter)
 
         std::cout << "iteration: " << maxIter - restIterCnt << "\n\n" << std::endl;
 
-        auto lastFace = RegionGrow();
+        //auto lastFace = RegionGrow();
+        auto lastFace = RegionGrowSync();
         UpdateClusterCenters();
+        //UpdateClusterCentersByPos();
         if (IsConverged())
             break;
 
@@ -70,7 +80,7 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
 
     std::vector<OpenMesh::FProp<bool>> visitedProps;
     for (int i = 0; i < m_seeds.size(); ++ i) {
-        visitedProps.emplace_back(OpenMesh::FProp<bool>(m_mesh));
+        visitedProps.emplace_back(m_mesh);
     }
 
     for (int i = 0; i < m_seeds.size(); ++ i) {
@@ -88,7 +98,6 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
         bool notEmpty = false;
 
         for (int clusterId = 0; clusterId < m_seeds.size(); ++ clusterId) {
-            const auto& seed = m_seeds[clusterId];
             auto& queue = queues[clusterId];
 
             if (queue.empty())
@@ -139,6 +148,61 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
     return lastFace;
 }
 
+Mesh::FaceHandle IterativeCluster::RegionGrowSync()
+{
+    PriorityQueue queue;
+    ClearClusterProp();
+
+    std::vector<OpenMesh::FProp<bool>> visitedProps;
+    for (int i = 0; i < m_seeds.size(); ++ i) {
+        visitedProps.emplace_back(m_mesh);
+    }
+
+    for (int clusterId = 0; clusterId < m_seeds.size(); ++ clusterId) {
+        auto seed = m_seeds[clusterId];
+        m_clusterProp[seed] = clusterId;
+        queue.emplace(0.0f, seed, clusterId, true);
+        visitedProps[clusterId][seed] = true;
+    }
+    m_clusterNormals = std::vector<Mesh::Normal>(m_seeds.size(), Mesh::Normal(0, 0, 0));
+
+    Mesh::FaceHandle lastFace;
+    while (!queue.empty()) {
+        auto item = queue.top();
+        queue.pop();
+
+        auto fh = item.handle;
+        if (!item.seed && m_clusterProp[fh] != kInvalidClusterId)
+            continue;
+
+        // update data
+        const int clusterId = item.clusterId;
+
+        m_clusterProp[fh] = clusterId;
+        m_clusterNormals[clusterId] += m_mesh.normal(fh);
+        m_clusterNormals[clusterId].normalize();
+        lastFace = fh;
+
+        for (auto f : m_mesh.ff_range(fh)) {
+            if (m_clusterProp[f] != kInvalidClusterId)
+                continue;
+
+            if (visitedProps[clusterId][f])
+                continue;
+
+            auto cost = CalculateCost(m_clusterNormals[clusterId], fh, f);
+            queue.emplace(item.cost + cost, f, clusterId);
+            visitedProps[clusterId][f] = true;
+        }
+    }
+
+    if (!lastFace.is_valid()) {
+        std::cout << lastFace.idx() << std::endl;
+    }
+
+    return lastFace;
+}
+
 
 float IterativeCluster::CalculateCost(const Mesh::Normal& chartNormal, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace)
 {
@@ -175,38 +239,87 @@ void IterativeCluster::UpdateClusterCenters()
 {
     for (int i = 0; i < m_seeds.size(); ++ i) {
         auto mesh = GetClusterMesh(i);
-        auto visited = OpenMesh::FProp<bool>(mesh);
+        m_seeds[i] = FindCenterOfMesh(mesh);
+    }
+}
 
-        PriorityQueue queue;
-        for (auto fh : mesh.faces()) {
-            if (mesh.is_boundary(fh)) {
-                queue.emplace(0.0f, fh);
-            }
+Mesh::FaceHandle IterativeCluster::FindCenterOfMesh(const Mesh& mesh)
+{
+    auto visited = OpenMesh::FProp<bool>(mesh);
+
+    PriorityQueue queue;
+    for (auto fh : mesh.faces()) {
+        if (mesh.is_boundary(fh)) {
+            queue.emplace(0.0f, fh, 0, true);
+        }
+    }
+
+    Mesh::FaceHandle lastFace;
+
+    int cnt = 0;
+
+    while (!queue.empty()) {
+        auto item = queue.top();
+        queue.pop();
+
+        if (!item.seed && visited[item.handle])
+            continue;
+
+        cnt ++;
+        if (cnt > mesh.n_faces()) {
+            std::cout << "queue: " << cnt << std::endl;
         }
 
-        Mesh::FaceHandle lastFace;
-        while (!queue.empty()) {
-            auto item = queue.top();
+        auto face = item.handle;
+        visited[face] = true;
+        lastFace = face;
 
-            queue.pop();
+        for (auto fh : mesh.ff_range(face)) {
+            if (visited[fh])
+                continue;
 
-            auto face = item.handle;
-            visited[face] = true;
-            lastFace = face;
+            if (!fh.is_valid()) {
+                std::cout << "invalid in enqueue: " << lastFace.idx() << std::endl;
+            }
 
-            for (auto fh : mesh.ff_range(face)) {
-                if (visited[fh])
-                    continue;
+            auto l = mesh.calc_face_centroid(face);
+            auto r = mesh.calc_face_centroid(fh);
+            auto cost = (l - r).length();
 
-                auto l = mesh.calc_face_centroid(face);
-                auto r = mesh.calc_face_centroid(fh);
-                auto cost = (l - r).length();
+            queue.emplace(item.cost + cost, fh);
+        }
+    }
 
-                queue.emplace(cost, fh);
+    if (!lastFace.is_valid()) {
+        std::cout << "invalid for last face: " << lastFace.idx() << std::endl;
+    }
+    return lastFace;
+}
+
+void IterativeCluster::UpdateClusterCentersByPos()
+{
+    for (int i = 0; i < m_seeds.size(); ++ i) {
+        auto mesh = GetClusterMesh(i);
+
+        OpenMesh::Vec3f center(0, 0, 0);
+        for (const auto fh : mesh.faces()) {
+            center += mesh.calc_face_centroid(fh);
+        }
+        center /= mesh.n_faces();
+
+        Mesh::FaceHandle seed;
+        float minDist = std::numeric_limits<float>::max();
+
+        for (const auto fh : mesh.faces()) {
+            auto fpos = mesh.calc_face_centroid(fh);
+            float dist = (fpos - center).length();
+
+            if (dist < minDist) {
+                minDist = dist;
+                seed = fh;
             }
         }
-
-        m_seeds[i] = lastFace;
+        m_seeds[i] = seed;
     }
 }
 

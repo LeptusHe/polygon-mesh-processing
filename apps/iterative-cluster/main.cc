@@ -69,9 +69,9 @@ int main(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int clusterCnt = 5;
+    int clusterCnt = 10;
     int maxIteration = 100;
-    cluster.Run(clusterCnt, 1, maxIteration);
+    cluster.Run(clusterCnt, 1.2, maxIteration);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();
@@ -96,6 +96,11 @@ int main(int argc, char *argv[])
             //auto c = Eigen::Vector3d{pos[0], pos[1], pos[2]};
             //viewer.data().add_label(c, fmt::format("{}", clusterId));
         }
+
+        auto centers = cluster.GetChartCenters();
+        for (const auto fh : centers) {
+            C.row(fh.idx()) = Eigen::Vector3d{0, 0, 0};
+        }
     };
 
 
@@ -118,6 +123,22 @@ int main(int argc, char *argv[])
     };
 
     set_color_to_mesh();
+
+    auto center = cluster.FindCenterOfMesh(mesh);
+    C.row(center.idx()) = Eigen::Vector3d{1, 0, 0};
+    for (auto faceHandle: mesh.faces()) {
+        //C.row(faceHandle.idx()) = Eigen::Vector3d{0, 1, 0};
+    }
+
+    for (const auto fh : mesh.ff_range(center)) {
+        //C.row(fh.idx()) = Eigen::Vector3d{1, 0, 0};
+    }
+
+    for (auto fh : mesh.faces()) {
+        if (mesh.is_boundary(fh)) {
+            //C.row(fh.idx()) = Eigen::Vector3d{0, 0, 1};
+        }
+    }
 
     //viewer.data().show_custom_labels = true;
     viewer.data().set_mesh(V, F);
