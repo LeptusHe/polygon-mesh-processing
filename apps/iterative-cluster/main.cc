@@ -70,8 +70,8 @@ int main(int argc, char *argv[])
     IterativeCluster cluster(mesh, clusterProp);
 
     int clusterCnt = 8;
-    int maxIteration = 100;
-    cluster.Run(clusterCnt, 1.2, maxIteration);
+    int maxIteration = 200;
+    cluster.Run(clusterCnt, 1., maxIteration);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();

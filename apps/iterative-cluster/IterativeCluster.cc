@@ -268,6 +268,16 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>&
         std::cout << lastFace.idx() << std::endl;
     }
 
+    if (newSeeds.empty()) {
+        for (auto fh: m_mesh.faces()) {
+            if (m_clusterProp[fh] == kInvalidClusterId) {
+                std::cout << "add not connected sed: " << fh.idx() << std::endl;
+                newSeeds.push_back(fh);
+                break;
+            }
+        }
+    }
+
     return lastFace;
 }
 
