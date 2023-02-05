@@ -13,7 +13,7 @@ public:
     IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp);
     void Run(int k, float lambda, int maxIter = 100);
     Mesh::FaceHandle RegionGrow();
-    Mesh::FaceHandle RegionGrowSync();
+    Mesh::FaceHandle RegionGrowSync(std::vector<Mesh::FaceHandle>& newSeeds);
     float CalculateCost(const Mesh::Normal& chartNormal, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace);
     void InitSeed();
     void ClearClusterProp();
@@ -22,8 +22,9 @@ public:
     Mesh GetClusterMesh(int clusterId);
     bool IsConverged() const;
     std::vector<Mesh::FaceHandle> GetChartCenters() { return m_seeds; }
-
     Mesh::FaceHandle FindCenterOfMesh(const Mesh& mesh);
+    void AddSeed(const Mesh::FaceHandle& fh);
+    size_t GetClusterCount() const { return m_seeds.size(); }
 
 private:
 
@@ -34,6 +35,7 @@ private:
 
     OpenMesh::FProp<int>& m_clusterProp;
     std::vector<Mesh::Normal> m_clusterNormals;
+    std::vector<Mesh> m_chartMeshes;
 
     std::vector<Mesh::FaceHandle> m_prevSeeds;
     std::vector<Mesh::FaceHandle> m_seeds;

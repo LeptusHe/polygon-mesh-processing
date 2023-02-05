@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int clusterCnt = 10;
+    int clusterCnt = 8;
     int maxIteration = 100;
     cluster.Run(clusterCnt, 1.2, maxIteration);
 
@@ -84,7 +84,8 @@ int main(int argc, char *argv[])
     igl::opengl::glfw::imgui::ImGuiMenu menu;
     plugin.widgets.push_back(&menu);
 
-    ColorSetGenerator colorSetGenerator(clusterCnt);
+    int totalClusterCnt = static_cast<int>(cluster.GetClusterCount());
+    ColorSetGenerator colorSetGenerator(totalClusterCnt);
     auto colors = colorSetGenerator.GetColorSet();
 
     auto set_color_to_mesh = [&]() { ;
@@ -99,7 +100,9 @@ int main(int argc, char *argv[])
 
         auto centers = cluster.GetChartCenters();
         for (const auto fh : centers) {
-            C.row(fh.idx()) = Eigen::Vector3d{0, 0, 0};
+            auto clusterId = clusterProp[fh];
+            auto color = colors[clusterId];
+            C.row(fh.idx()) = 0.5 * color; //Eigen::Vector3d{0, 0, 0};
         }
     };
 
@@ -125,13 +128,15 @@ int main(int argc, char *argv[])
     set_color_to_mesh();
 
     auto center = cluster.FindCenterOfMesh(mesh);
-    C.row(center.idx()) = Eigen::Vector3d{1, 0, 0};
-    for (auto faceHandle: mesh.faces()) {
-        //C.row(faceHandle.idx()) = Eigen::Vector3d{0, 1, 0};
+    if (center.is_valid()) {
+        C.row(center.idx()) = Eigen::Vector3d{1, 0, 0};
+        for (const auto fh : mesh.ff_range(center)) {
+            //C.row(fh.idx()) = Eigen::Vector3d{1, 0, 0};
+        }
     }
 
-    for (const auto fh : mesh.ff_range(center)) {
-        //C.row(fh.idx()) = Eigen::Vector3d{1, 0, 0};
+    for (auto faceHandle: mesh.faces()) {
+        //C.row(faceHandle.idx()) = Eigen::Vector3d{0, 1, 0};
     }
 
     for (auto fh : mesh.faces()) {

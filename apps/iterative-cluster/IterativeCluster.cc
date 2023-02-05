@@ -33,27 +33,38 @@ IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp
 
 void IterativeCluster::Run(int k, float lambda, int maxIter)
 {
-    m_clusterCount = k;
+    m_clusterCount = std::min(static_cast<int>(m_mesh.n_faces()), k);
     m_lambda = std::max(1.0f, lambda);
 
     InitSeed();
 
+    std::vector<OpenMesh::FaceHandle> newSeeds;
+
     auto restIterCnt = maxIter;
-    while (restIterCnt > 0) {
+    while (!newSeeds.empty() || restIterCnt > 0) {
         m_prevSeeds = m_seeds;
 
         std::cout << "iteration: " << maxIter - restIterCnt << "\n\n" << std::endl;
 
+        newSeeds.clear();
         //auto lastFace = RegionGrow();
-        auto lastFace = RegionGrowSync();
+        auto lastFace = RegionGrowSync(newSeeds);
         UpdateClusterCenters();
         //UpdateClusterCentersByPos();
-        if (IsConverged())
+
+        if (newSeeds.empty()) {
+            if (m_seeds.size() < m_clusterCount) {
+                AddSeed(lastFace);
+            }
+        } else {
+            for (auto newSeed: newSeeds) {
+                AddSeed(newSeed);
+            }
+        }
+
+        if (newSeeds.empty() && IsConverged())
             break;
 
-        if (m_seeds.size() < m_clusterCount) {
-            m_seeds.push_back(lastFace);
-        }
         restIterCnt -= 1;
 
         std::cout << "iterative count: " << maxIter - restIterCnt << std::endl;
@@ -148,23 +159,42 @@ Mesh::FaceHandle IterativeCluster::RegionGrow()
     return lastFace;
 }
 
-Mesh::FaceHandle IterativeCluster::RegionGrowSync()
+Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>& newSeeds)
 {
     PriorityQueue queue;
     ClearClusterProp();
 
+    const size_t seedCount = m_seeds.size();
+
     std::vector<OpenMesh::FProp<bool>> visitedProps;
-    for (int i = 0; i < m_seeds.size(); ++ i) {
+    for (int i = 0; i < seedCount; ++ i) {
         visitedProps.emplace_back(m_mesh);
     }
 
-    for (int clusterId = 0; clusterId < m_seeds.size(); ++ clusterId) {
+    m_chartMeshes.clear();
+    for (int i = 0; i < seedCount; ++ i) {
+        auto chartMesh = m_mesh;
+        for (const auto face : chartMesh.faces()) {
+            chartMesh.delete_face(face, false);
+        }
+        chartMesh.garbage_collection(false, true, true);
+
+        //std::cout << "vertex n: " << chartMesh.n_vertices() << std::endl;
+        //std::cout << "face n: " << chartMesh.n_faces() << std::endl;
+        //std::cout << "half edge n: " << chartMesh.n_halfedges() << std::endl;
+
+        m_chartMeshes.push_back(chartMesh);
+    }
+
+    for (int clusterId = 0; clusterId < seedCount; ++ clusterId) {
         auto seed = m_seeds[clusterId];
         m_clusterProp[seed] = clusterId;
         queue.emplace(0.0f, seed, clusterId, true);
         visitedProps[clusterId][seed] = true;
     }
-    m_clusterNormals = std::vector<Mesh::Normal>(m_seeds.size(), Mesh::Normal(0, 0, 0));
+    m_clusterNormals = std::vector<Mesh::Normal>(seedCount, Mesh::Normal(0, 0, 0));
+
+    int count = 0;
 
     Mesh::FaceHandle lastFace;
     while (!queue.empty()) {
@@ -175,8 +205,46 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync()
         if (!item.seed && m_clusterProp[fh] != kInvalidClusterId)
             continue;
 
-        // update data
+        count += 1;
+        if (count > m_mesh.n_faces()) {
+            std::cout << "invalid queue: " << count  << std::endl;
+        }
+
         const int clusterId = item.clusterId;
+
+        // add face to chart
+        std::vector<Mesh::VertexHandle> fhs;
+        for (const auto vh : m_mesh.fv_range(fh)) {
+            if (!m_chartMeshes[clusterId].is_boundary(vh)) {
+                std::cout <<  "invalid boundary vertex" << std::endl;
+            }
+            fhs.push_back(vh);
+        }
+
+        auto& chartMesh = m_chartMeshes[clusterId];
+        auto newFH = chartMesh.add_face(fhs);
+        if (!newFH.is_valid()) {
+            std::cout << "invalid add face: " << newFH.idx() << std::endl;
+            std::cout << "half edges: " << chartMesh.n_halfedges() << std::endl;
+            std::cout << "edges: " << chartMesh.n_edges() << std::endl;
+            std::cout << "faces: " << chartMesh.n_faces() << std::endl;
+        }
+
+        bool isClosed = true;
+        for (const auto he : chartMesh.halfedges()) {
+            if (chartMesh.is_boundary(he)) {
+                isClosed = false;
+                break;
+            }
+        }
+        if (isClosed) {
+            chartMesh.delete_face(newFH);
+            newSeeds.push_back(fh);
+            std::cout << "close mesh: " << fh.idx() << std::endl;
+            continue;
+        }
+
+        // update data
 
         m_clusterProp[fh] = clusterId;
         m_clusterNormals[clusterId] += m_mesh.normal(fh);
@@ -350,4 +418,15 @@ bool IterativeCluster::IsConverged() const
             return false;
     }
     return true;
+}
+
+void IterativeCluster::AddSeed(const Mesh::FaceHandle& fh)
+{
+    for (const auto& seed : m_seeds) {
+        if (seed == fh) {
+            std::cout << "ignore exist seed: " << fh.idx() << std::endl;
+            return;
+        }
+    }
+    m_seeds.push_back(fh);
 }
