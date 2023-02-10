@@ -5,11 +5,11 @@ add_cxxflags("/bigobj")
 enable_debug = is_mode("debug")
 print("enable debug:", enable_debug)
 
-libigl = "libigl-240"
+libigl = "libigl"
 
 include_dirs = {"src"} --, "externals/libigl/include"}
 
-package(libigl)
+package("libigltest")
     set_homepage("https://libigl.github.io/")
     set_description("Simple C++ geometry processing library.")
     set_license("MPL-2.0")
@@ -55,7 +55,7 @@ package(libigl)
             print("copy imgui fonts")
         end
         if package:config("header_only") then
-            os.cp("include/igl", package:installdir("include"))a
+            os.cp("include/igl", package:installdir("include"))
             return
         end
         local configs = {"-DLIBIGL_BUILD_TESTS=OFF", "-DLIBIGL_BUILD_TUTORIALS=OFF", "-DLIBIGL_SKIP_DOWNLOAD=ON"}
@@ -126,6 +126,7 @@ fmt = "fmt"
 glad = "glad"
 eigen = "eigen"
 openmesh = "openmesh"
+glew = "glew"
 glfw = "glfw"
 polyscope = "polyscope"
 
@@ -136,9 +137,9 @@ add_requires(glad, {debug=enable_debug, system=false})
 add_requires(eigen, {debug=enable_debug, system=false})
 add_requires(openmesh, {debug=enable_debug, system=false})
 add_requires(glfw, {debug=enable_debug, system=false})
-add_requires(polyscope, {debug=enable_debug, system=false})
+add_requires(polyscope, {configs={shared=true}, debug=enable_debug, system=false})
 
-packages = {fmt, glad, eigen, openmesh, glfw, polyscope}
+packages = {fmt, libigl, glew, glad, eigen, openmesh, glfw, polyscope}
 
 target("meshlib")
     set_languages("c++17")

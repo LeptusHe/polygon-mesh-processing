@@ -4,6 +4,7 @@
 #include <igl/per_face_normals.h>
 #include <igl/per_corner_normals.h>
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/exact_geodesic.h>
 #include <fmt/format.h>
 #include "property/face-normal.h"
 #include <polyscope/polyscope.h>
@@ -78,7 +79,56 @@ int main(int argc, char *argv[])
             D(i, j) = (V.row(i) - V.row(j)).norm();
         }
     }
-    std::cout << D << std::endl;
+    //std::cout << D << std::endl;
+    Eigen::VectorXi VS = Eigen::VectorXi ::Zero(V.rows());
+    Eigen::VectorXi VT = Eigen::VectorXi ::Zero(V.rows());
+
+    Eigen::VectorXi FS; // = Eigen::VectorXi ::Zero(F.rows());
+    Eigen::VectorXi FT; // = Eigen::VectorXi ::Zero(F.rows());
+    Eigen::VectorXd Ds;
+
+    for (int i = 0; i < V.rows(); ++ i) {
+        VS(i) = i;
+        VT(i) = (i + 10) % V.rows();
+    }
+
+    for (int i = 0; i < F.rows(); ++ i) {
+        //FS(i) = i;
+        //FT(i) = i;
+    }
+
+    VS.resize(1);
+    for (int i = 0; i < V.rows(); ++ i) {
+        // The selected vertex is the source
+        VS << i;
+        // All vertices are the targets
+        VT.setLinSpaced(V.rows(), 0, V.rows() - 1);
+
+        std::cout << "Computing geodesic distance to vertex " << i << "..." << std::endl;
+
+        igl::exact_geodesic(V, F, VS, FS, VT, FT, Ds);
+
+        for (int j = 0; j < V.rows(); ++ j) {
+            D(i, j) = Ds(j);
+        }
+    }
+
+    igl::exact_geodesic(V, F, VS, FS, VT, FT, Ds);
+    std::cout << "ds: row " << Ds.rows() << std::endl;
+    std::cout << VS << std::endl;
+    std::cout << VT << std::endl;
+    std::cout << Ds << std::endl;
+
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(V.rows(), 3);
+    for (int i = 0; i < V.rows(); ++ i) {
+        auto d = D(i);
+
+        auto stripSize = 0.02;
+        auto color = std::sin((d / stripSize) * 3.1415926f);
+        color = std::abs(color);
+
+        C.row(i) = Eigen::Vector3d(color, color, color);
+    }
 
     auto uv = MDS.Compute(D, 2).transpose();
     std::cout << fmt::format("uv: row={0}, col={1}", uv.rows(), uv.cols()) << std::endl;
@@ -94,21 +144,24 @@ int main(int argc, char *argv[])
     //std::cout << D << std::endl;
 
     for (int i = 0; i < V.rows(); ++ i) {
-        V.row(i) = Eigen::Vector3d{uv(i, 0), uv(i, 1), 0};
+        C.row(i) = Eigen::Vector3d{uv(i, 0), uv(i, 1), 0};
     }
 
+    /*
     polyscope::init();
     polyscope::registerSurfaceMesh("mesh", V, F);
     polyscope::show();
 
-    /*
+    polyscope::getSurfaceMesh("mesh")->addVertexColorQuantity("vColor", C);
+     */
+
     igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_mesh(uv, F);
+    viewer.data().set_mesh(C, F);
+    viewer.data().set_colors(C);
     viewer.callback_key_down = &key_down;
     viewer.data().set_normals(N_faces);
 
     viewer.launch();
-     */
 
     return 0;
 }

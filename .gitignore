@@ -1,5 +1,7 @@
 # Project Files
 data/result/*
+*.ini
+imgui.ini
 
 # Jetbrains
 .idea/*

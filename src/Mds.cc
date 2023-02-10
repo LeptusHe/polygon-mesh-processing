@@ -9,7 +9,8 @@ Eigen::MatrixXd mds::Compute(const Eigen::MatrixXd& D, unsigned int dim)
     const unsigned n = D.rows();
     const Eigen::MatrixXd H = Eigen::MatrixXd::Identity(n, n) - (1.0 / static_cast<double>(n)) * Eigen::VectorXd::Ones(n) * Eigen::VectorXd::Ones(n).transpose();
     const Eigen::MatrixXd K = - 0.5 * H * D * H;
-    const Eigen::EigenSolver<Eigen::MatrixXd> solver(K);
+    const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(K);
+    //const Eigen::EigenSolver<Eigen::MatrixXd> solver(K);
     Eigen::VectorXd S = solver.eigenvalues().real();
     Eigen::MatrixXd V = solver.eigenvectors().real();
 
