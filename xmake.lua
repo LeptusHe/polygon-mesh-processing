@@ -3,6 +3,8 @@ add_rules("mode.debug", "mode.release")
 add_cxxflags("/bigobj")
 
 enable_debug = is_mode("debug")
+set_runtimes(is_mode("debug") and "MDd" or "MD")
+
 print("enable debug:", enable_debug)
 
 libigl = "libigl"
@@ -157,9 +159,6 @@ target("01-geometry-property-visualization")
     set_kind("binary")
     add_files("apps/geom-prop-vis/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -168,9 +167,6 @@ target("02-parametrization-tutte")
     set_kind("binary")
     add_files("apps/param-tutte/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -179,9 +175,6 @@ target("03-decimation")
     set_kind("binary")
     add_files("apps/decimation/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -190,9 +183,6 @@ target("04-openmesh")
     set_kind("binary")
     add_files("apps/openmesh/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -201,9 +191,6 @@ target("05-k-means")
     set_kind("binary")
     add_files("apps/k-means/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -212,9 +199,6 @@ target("06-iterative-cluster")
     set_kind("binary")
     add_files("apps/iterative-cluster/*.cc")
     add_packages(packages)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
 
@@ -224,8 +208,5 @@ target("07-multi-dimension-scaling")
     add_files("apps/multi-dimension-scaling/*.cc")
     add_packages(packages)
     add_packages(imgui)
-    if (enable_debug) then
-        set_runtimes("MT")
-    end
     add_includedirs(include_dirs)
     add_deps("meshlib")
