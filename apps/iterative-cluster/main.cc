@@ -70,8 +70,10 @@ int main(int argc, char *argv[])
     IterativeCluster cluster(mesh, clusterProp);
 
     int clusterCnt = 8;
-    int maxIteration = 200;
-    cluster.Run(clusterCnt, 1., maxIteration);
+    int maxIteration = 100;
+
+    cluster.Init(clusterCnt, 1.0f, maxIteration);
+    //cluster.Run(clusterCnt, 1., maxIteration);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();
@@ -84,7 +86,7 @@ int main(int argc, char *argv[])
     igl::opengl::glfw::imgui::ImGuiMenu menu;
     plugin.widgets.push_back(&menu);
 
-    int totalClusterCnt = static_cast<int>(cluster.GetClusterCount());
+    int totalClusterCnt = clusterCnt + 10; // static_cast<int>(cluster.GetClusterCount());
     ColorSetGenerator colorSetGenerator(totalClusterCnt);
     auto colors = colorSetGenerator.GetColorSet();
 
@@ -102,7 +104,7 @@ int main(int argc, char *argv[])
         for (const auto fh : centers) {
             auto clusterId = clusterProp[fh];
             auto color = colors[clusterId];
-            C.row(fh.idx()) = 0.5 * color; //Eigen::Vector3d{0, 0, 0};
+            //C.row(fh.idx()) = 0.5 * color; //Eigen::Vector3d{0, 0, 0};
         }
     };
 
@@ -125,7 +127,15 @@ int main(int argc, char *argv[])
         return false;
     };
 
-    set_color_to_mesh();
+    viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer& viewer) {
+        if (cluster.UpdateCluster()) {
+            set_color_to_mesh();
+            viewer.data().set_colors(C);
+        }
+        return false;
+    };
+
+    //set_color_to_mesh();
 
     auto center = cluster.FindCenterOfMesh(mesh);
     if (center.is_valid()) {

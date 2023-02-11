@@ -26,6 +26,9 @@ public:
     void AddSeed(const Mesh::FaceHandle& fh);
     size_t GetClusterCount() const { return m_seeds.size(); }
 
+    bool Init(int k, float lambda, int maxIter);
+    bool UpdateCluster();
+
 private:
 
 private:
@@ -37,6 +40,10 @@ private:
     std::vector<Mesh::Normal> m_clusterNormals;
     std::vector<Mesh> m_chartMeshes;
 
+    std::vector<OpenMesh::FaceHandle> m_newSeeds;
     std::vector<Mesh::FaceHandle> m_prevSeeds;
     std::vector<Mesh::FaceHandle> m_seeds;
+
+    int m_maxIterCnt = 0;
+    int m_restIterCnt = 0;
 };

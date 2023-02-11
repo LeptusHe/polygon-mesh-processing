@@ -33,49 +33,66 @@ IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp
 
 void IterativeCluster::Run(int k, float lambda, int maxIter)
 {
+    Init(k, lambda, maxIter);
+
+    while (true) {
+        if (!UpdateCluster())
+            break;
+    }
+
+    if (m_restIterCnt == 0) {
+        std::cout << "IterativeCluster: reach max iteration count: " << maxIter << std::endl;
+    } else {
+        std::cout << "IterativeCluster: converge in " << maxIter - m_restIterCnt << " iteration"  << std::endl;
+    }
+}
+
+bool IterativeCluster::Init(int k, float lambda, int maxIter)
+{
     m_clusterCount = std::min(static_cast<int>(m_mesh.n_faces()), k);
     m_lambda = std::max(1.0f, lambda);
 
+    m_maxIterCnt = maxIter;
+    m_restIterCnt = maxIter;
+
     InitSeed();
+    return true;
+}
 
-    std::vector<OpenMesh::FaceHandle> newSeeds;
 
-    auto restIterCnt = maxIter;
-    while (!newSeeds.empty() || restIterCnt > 0) {
-        m_prevSeeds = m_seeds;
+bool IterativeCluster::UpdateCluster()
+{
+    if (m_newSeeds.empty() && m_restIterCnt <= 0)
+        return false;
 
-        std::cout << "iteration: " << maxIter - restIterCnt << "\n\n" << std::endl;
+    m_prevSeeds = m_seeds;
 
-        newSeeds.clear();
-        //auto lastFace = RegionGrow();
-        auto lastFace = RegionGrowSync(newSeeds);
-        UpdateClusterCenters();
-        //UpdateClusterCentersByPos();
+    std::cout << "iteration: " << m_maxIterCnt - m_restIterCnt << "\n\n" << std::endl;
 
-        if (newSeeds.empty()) {
-            if (m_seeds.size() < m_clusterCount) {
-                AddSeed(lastFace);
-            }
-        } else {
-            for (auto newSeed: newSeeds) {
-                AddSeed(newSeed);
-            }
+    m_newSeeds.clear();
+    //auto lastFace = RegionGrow();
+    auto lastFace = RegionGrowSync(m_newSeeds);
+    UpdateClusterCenters();
+    //UpdateClusterCentersByPos();
+
+    if (m_newSeeds.empty()) {
+        if (m_seeds.size() < m_clusterCount) {
+            AddSeed(lastFace);
         }
-
-        if (newSeeds.empty() && IsConverged())
-            break;
-
-        restIterCnt -= 1;
-
-        std::cout << "iterative count: " << maxIter - restIterCnt << std::endl;
-        std::cout << "IterativeCluster: " << m_seeds.size() << " clusters" << std::endl;
-    }
-
-    if (restIterCnt == 0) {
-        std::cout << "IterativeCluster: reach max iteration count: " << maxIter << std::endl;
     } else {
-        std::cout << "IterativeCluster: converge in " << maxIter - restIterCnt << " iteration"  << std::endl;
+        for (auto newSeed: m_newSeeds) {
+            AddSeed(newSeed);
+        }
     }
+
+    if (m_newSeeds.empty() && IsConverged())
+        return true;
+
+    m_restIterCnt -= 1;
+
+    std::cout << "iterative count: " << m_maxIterCnt - m_restIterCnt << std::endl;
+    std::cout << "IterativeCluster: " << m_seeds.size() << " clusters" << std::endl;
+    return true;
 }
 
 void IterativeCluster::InitSeed()
