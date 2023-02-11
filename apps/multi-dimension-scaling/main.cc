@@ -9,6 +9,9 @@
 #include "property/face-normal.h"
 #include <polyscope/polyscope.h>
 #include <polyscope/surface_mesh.h>
+#include <fmt/ostream.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include "mds.h"
 
 Eigen::MatrixXd V;
@@ -16,6 +19,8 @@ Eigen::MatrixXi F;
 Eigen::MatrixXd N_vertices;
 Eigen::MatrixXd N_faces;
 Eigen::MatrixXd N_corners;
+
+template <> struct fmt::formatter<Eigen::MatrixXd> : fmt::ostream_formatter {};
 
 bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier)
 {
@@ -62,6 +67,9 @@ int main(int argc, char *argv[])
         std::cout << "face count: " << F.rows() << std::endl;
     }
 
+    auto logger = spdlog::basic_logger_mt("basic_logger", "logs/basic1.txt");
+    auto clogger = spdlog::basic_logger_mt("basic_logger2", "logs/basic2.txt");
+
     // Compute per-face normals
     igl::per_face_normals(V, F, N_faces);
 
@@ -79,6 +87,8 @@ int main(int argc, char *argv[])
             D(i, j) = (V.row(i) - V.row(j)).norm();
         }
     }
+
+
     //std::cout << D << std::endl;
     Eigen::VectorXi VS = Eigen::VectorXi ::Zero(V.rows());
     Eigen::VectorXi VT = Eigen::VectorXi ::Zero(V.rows());
@@ -109,7 +119,7 @@ int main(int argc, char *argv[])
         igl::exact_geodesic(V, F, VS, FS, VT, FT, Ds);
 
         for (int j = 0; j < V.rows(); ++ j) {
-            D(i, j) = Ds(j);
+            D(i, j) = Ds(j) * Ds(j);
         }
     }
 
@@ -118,6 +128,9 @@ int main(int argc, char *argv[])
     std::cout << VS << std::endl;
     std::cout << VT << std::endl;
     std::cout << Ds << std::endl;
+
+    std::cout << "matrix D" << std::endl;
+    std::cout << D << std::endl;
 
     Eigen::MatrixXd C = Eigen::MatrixXd::Zero(V.rows(), 3);
     for (int i = 0; i < V.rows(); ++ i) {
@@ -130,16 +143,34 @@ int main(int argc, char *argv[])
         C.row(i) = Eigen::Vector3d(color, color, color);
     }
 
-    auto uv = MDS.Compute(D, 2).transpose();
+    logger->info("{0}", D);
+
+    auto uv1 = MDS.Compute(D, 2);
+    std::cout << "uv: " << uv1 << std::endl;
+
+    auto uv = uv1.transpose();
+    std::cout << "uv: " << uv << std::endl;
+
     std::cout << fmt::format("uv: row={0}, col={1}", uv.rows(), uv.cols()) << std::endl;
     std::cout << uv << std::endl;
 
-    D = Eigen::MatrixXd::Zero(V.rows(), V.rows());
+    Eigen::MatrixXd realD = Eigen::MatrixXd::Zero(V.rows(), V.rows());
     for (int i = 0; i < V.rows(); i++) {
         for (int j = 0; j < V.rows(); j++) {
-            D(i, j) = (uv.row(i) - uv.row(j)).norm();
+            float v = (uv.row(i) - uv.row(j)).norm();
+            realD(i, j) = (uv.row(i) - uv.row(j)).squaredNorm();
         }
     }
+    clogger->info("{0}", realD);
+
+    float diff = 0;
+    for (int i = 0; i < V.rows(); ++ i) {
+        for (int j = 0; j < V.rows(); ++ j) {
+            diff += std::abs(D(i, j) - realD(i, j));
+        }
+    }
+    std::cout << "diff: " << diff << std::endl;
+
     //std::cout << "uv matrix: " << std::endl;
     //std::cout << D << std::endl;
 

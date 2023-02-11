@@ -1,4 +1,4 @@
-add_rules("mode.debug")
+add_rules("mode.debug", "mode.release")
 
 add_cxxflags("/bigobj")
 
@@ -129,6 +129,7 @@ openmesh = "openmesh"
 glew = "glew"
 glfw = "glfw"
 polyscope = "polyscope"
+spdlog = "spdlog"
 
 add_requires(libigl, {configs={imgui=true}, debug=enable_debug})
 --add_requires(imgui, {configs={glfw_opengl3=true}, debug=enable_debug, system=false})
@@ -138,8 +139,9 @@ add_requires(eigen, {debug=enable_debug, system=false})
 add_requires(openmesh, {debug=enable_debug, system=false})
 add_requires(glfw, {debug=enable_debug, system=false})
 add_requires(polyscope, {configs={shared=true}, debug=enable_debug, system=false})
+add_requires(spdlog, {debug=enable_debug, system=false})
 
-packages = {fmt, libigl, glew, glad, eigen, openmesh, glfw, polyscope}
+packages = {fmt, libigl, glew, glad, eigen, openmesh, glfw, polyscope, spdlog}
 
 target("meshlib")
     set_languages("c++17")

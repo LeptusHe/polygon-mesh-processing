@@ -1,5 +1,6 @@
 #include "Mds.h"
 #include <cassert>
+#include <iostream>
 
 Eigen::MatrixXd mds::Compute(const Eigen::MatrixXd& D, unsigned int dim)
 {
@@ -8,14 +9,35 @@ Eigen::MatrixXd mds::Compute(const Eigen::MatrixXd& D, unsigned int dim)
 
     const unsigned n = D.rows();
     const Eigen::MatrixXd H = Eigen::MatrixXd::Identity(n, n) - (1.0 / static_cast<double>(n)) * Eigen::VectorXd::Ones(n) * Eigen::VectorXd::Ones(n).transpose();
+
+    std::cout << H << std::endl;
+
     const Eigen::MatrixXd K = - 0.5 * H * D * H;
     const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(K);
-    //const Eigen::EigenSolver<Eigen::MatrixXd> solver(K);
+    //Eigen::EigenSolver<Eigen::MatrixXd> solver(K);
+    if (solver.info() != Eigen::Success) {
+        std::cout << "EigenSolver failed" << std::endl;
+        return Eigen::MatrixXd();
+    }
+
     Eigen::VectorXd S = solver.eigenvalues().real();
     Eigen::MatrixXd V = solver.eigenvectors().real();
 
+    std::cout << "S: " << S << std::endl;
+    std::cout << "V: " << V << std::endl;
+
     ExtractNLargestEigens(dim, S, V);
+
+    std::cout << "V: " << V << std::endl;
+    std::cout << "S: " << S << std::endl;
+
+    std::cout << " S sise" << std::endl;
+    auto t = S.cwiseSqrt();
+    std::cout << t << std::endl;
+
     const Eigen::MatrixXd X = Eigen::DiagonalMatrix<double, Eigen::Dynamic>(S.cwiseSqrt()) * V.transpose();
+
+    std::cout << "X: " << X << std::endl;
     return X;
 }
 

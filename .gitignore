@@ -2,6 +2,7 @@
 data/result/*
 *.ini
 imgui.ini
+logs/*
 
 # Jetbrains
 .idea/*
