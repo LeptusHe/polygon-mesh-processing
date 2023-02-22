@@ -6,11 +6,16 @@
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
 class IterativeCluster {
+public:
+    struct Options {
+        float maxArea = 0.0f;
+    };
+
 private:
     const int kInvalidClusterId = -1;
 
 public:
-    IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp);
+    IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp, const Options& options);
     void Run(int k, float lambda, int maxIter = 100);
     Mesh::FaceHandle RegionGrow();
     Mesh::FaceHandle RegionGrowSync(std::vector<Mesh::FaceHandle>& newSeeds);
@@ -30,8 +35,6 @@ public:
     bool UpdateCluster();
 
 private:
-
-private:
     Mesh& m_mesh;
     float m_lambda = 1;
     int m_clusterCount = 0;
@@ -39,11 +42,13 @@ private:
     OpenMesh::FProp<int>& m_clusterProp;
     std::vector<Mesh::Normal> m_clusterNormals;
     std::vector<Mesh> m_chartMeshes;
+    std::vector<float> m_chartAreas;
 
     std::vector<OpenMesh::FaceHandle> m_newSeeds;
     std::vector<Mesh::FaceHandle> m_prevSeeds;
     std::vector<Mesh::FaceHandle> m_seeds;
 
+    Options m_options;
     int m_maxIterCnt = 0;
     int m_restIterCnt = 0;
 };

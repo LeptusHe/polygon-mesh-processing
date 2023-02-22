@@ -58,21 +58,28 @@ int main(int argc, char *argv[])
         V.row(vertHandle.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
     }
 
+    float area = 0.0f;
     for (auto faceHandle : mesh.faces()) {
+        area += mesh.calc_face_area(faceHandle);
+
         auto fvIter = mesh.cfv_iter(faceHandle);
         for (int i = 0; i < 3; ++ i) {
             F(faceHandle.idx(), i) = fvIter->idx();
             ++ fvIter;
         }
     }
+    std::cout << fmt::format("mesh total area: {}\n", area);
+
+    IterativeCluster::Options options;
+    options.maxArea = 256.0f;
 
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
-    IterativeCluster cluster(mesh, clusterProp);
+    IterativeCluster cluster(mesh, clusterProp, options);
 
     int clusterCnt = 8;
     int maxIteration = 100;
 
-    cluster.Init(clusterCnt, 1.0f, maxIteration);
+    cluster.Init(clusterCnt, 1.1f, maxIteration);
     //cluster.Run(clusterCnt, 1., maxIteration);
 
     //cluster.InitSeed();
@@ -90,7 +97,11 @@ int main(int argc, char *argv[])
     ColorSetGenerator colorSetGenerator(totalClusterCnt);
     auto colors = colorSetGenerator.GetColorSet();
 
-    auto set_color_to_mesh = [&]() { ;
+    auto set_color_to_mesh = [&]() {
+        auto count = cluster.GetClusterCount();
+        auto colorGenerator = ColorSetGenerator(count);
+        auto colors = colorGenerator.GetColorSet();
+
         for (auto faceHandle: mesh.faces()) {
             auto clusterId = clusterProp[faceHandle];
             C.row(faceHandle.idx()) = colors[clusterId];
@@ -109,12 +120,53 @@ int main(int argc, char *argv[])
     };
 
 
+    int clusterColorIndex = 0;
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
         if (ImGui::InputInt("max iteration", &maxIteration)) {
             cluster.Run(clusterCnt, 1, maxIteration);
             set_color_to_mesh();
+        }
+
+        if (ImGui::Button("output chart area")) {
+            auto clusterCount = cluster.GetClusterCount();
+            std::vector<float> areas(clusterCount, 0.0f);
+
+            for (auto faceHandle : mesh.faces()) {
+                auto clusterId = clusterProp[faceHandle];
+                areas[clusterId] += mesh.calc_face_area(faceHandle);
+            }
+
+            float totalArea = 0.0f;
+            for (int i = 0; i < clusterCount; ++ i) {
+                totalArea += areas[i];
+                std::cout << fmt::format("cluster {} area: {}\n", i, areas[i]);
+            }
+            std::cout << fmt::format("total area: {}\n", totalArea);
+        }
+
+        if (ImGui::InputInt("cluster index", &clusterColorIndex)) {
+            for (auto faceHandle : mesh.faces()) {
+                auto clusterId = clusterProp[faceHandle];
+                if (clusterId == clusterColorIndex) {
+                    C.row(faceHandle.idx()) = Eigen::Vector3d{1, 0, 0};
+                } else {
+                    C.row(faceHandle.idx()) = Eigen::Vector3d{0, 0, 0};
+                }
+            }
+            viewer.data().set_colors(C);
+        }
+
+        if (ImGui::Button("display boundary")) {
+            for (auto fh : mesh.faces()) {
+                if (mesh.is_boundary(fh)) {
+                    C.row(fh.idx()) = Eigen::Vector3d{1, 0, 0};
+                } else {
+                    C.row(fh.idx()) = Eigen::Vector3d{0, 0, 0};
+                }
+            }
+            viewer.data().set_colors(C);
         }
     };
 
@@ -158,6 +210,7 @@ int main(int argc, char *argv[])
     //viewer.data().show_custom_labels = true;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
+    viewer.data().shininess = 0.1f;
     viewer.launch();
 
     return 0;
