@@ -71,12 +71,12 @@ int main(int argc, char *argv[])
     std::cout << fmt::format("mesh total area: {}\n", area);
 
     IterativeCluster::Options options;
-    options.maxArea = 256.0f;
+    options.maxArea = 1024.0f;
 
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp, options);
 
-    int clusterCnt = 8;
+    int clusterCnt = area / options.maxArea;
     int maxIteration = 100;
 
     cluster.Init(clusterCnt, 1.1f, maxIteration);
@@ -104,7 +104,11 @@ int main(int argc, char *argv[])
 
         for (auto faceHandle: mesh.faces()) {
             auto clusterId = clusterProp[faceHandle];
-            C.row(faceHandle.idx()) = colors[clusterId];
+            if (clusterId == -1) {
+                C.row(faceHandle.idx()) = Eigen::Vector3d{0, 0, 0};
+            } else {
+                C.row(faceHandle.idx()) = colors[clusterId];
+            }
 
             //auto pos = mesh.calc_face_centroid(faceHandle);
             //auto c = Eigen::Vector3d{pos[0], pos[1], pos[2]};
@@ -210,7 +214,7 @@ int main(int argc, char *argv[])
     //viewer.data().show_custom_labels = true;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
-    viewer.data().shininess = 0.1f;
+    viewer.data().shininess = 100.0f;
     viewer.launch();
 
     return 0;
