@@ -10,10 +10,15 @@
 #include "MeshUtils.h"
 #include <queue>
 #include <utility>
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 using Item = std::pair<double, Mesh::EdgeHandle>;
 using PriorityQueue = std::priority_queue<Item, std::vector<Item>, std::greater<>>;
+
+using Decimater = OpenMesh::Decimater::DecimaterT<Mesh>;
+using HModQuadric = OpenMesh::Decimater::ModQuadricT<Mesh>::Handle;
 
 bool ValidToCollapse0(const Mesh& mesh, Mesh::EdgeHandle eh)
 {
@@ -236,6 +241,14 @@ int main(int argc, char *argv[])
         }
         return false;
     };
+
+    Decimater decimater(mesh);
+    HModQuadric modQuadric;
+    decimater.add(modQuadric);
+    decimater.initialize();
+    decimater.decimate_to(100);
+
+    mesh.garbage_collection();
 
     meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
 
