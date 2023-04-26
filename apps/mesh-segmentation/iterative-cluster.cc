@@ -1,4 +1,4 @@
-#include "IterativeCluster.h"
+#include "iterative-cluster.h"
 #include <queue>
 
 struct Item {
@@ -27,35 +27,42 @@ struct ItemComp {
 using PriorityQueue = std::priority_queue<Item, std::vector<Item>, ItemComp>;
 
 
-IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp, const Options& options)
-    : m_mesh(mesh), m_clusterProp(clusterProp), m_options(options) {}
-
-
-void IterativeCluster::Run(int k, float lambda, int maxIter)
+IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp)
+    : m_mesh(mesh), m_clusterProp(clusterProp)
 {
-    Init(k, lambda, maxIter);
+}
+
+
+void IterativeCluster::Run(const IterativeCluster::Options& options)
+{
+    Init(m_options);
 
     while (true) {
         if (!UpdateCluster())
             break;
     }
 
+#if ENABLE_LOG
     if (m_restIterCnt == 0) {
-        std::cout << "IterativeCluster: reach max iteration count: " << maxIter << std::endl;
+        std::cout << "IterativeCluster: reach max iteration count: " << m_options.maxIteration << std::endl;
     } else {
-        std::cout << "IterativeCluster: converge in " << maxIter - m_restIterCnt << " iteration"  << std::endl;
+        std::cout << "IterativeCluster: converge in " << m_options.maxIteration - m_restIterCnt << " iteration"  << std::endl;
     }
+#endif
 }
 
-bool IterativeCluster::Init(int k, float lambda, int maxIter)
+bool IterativeCluster::Init(const IterativeCluster::Options& options)
 {
-    m_clusterCount = std::min(static_cast<int>(m_mesh.n_faces()), k);
-    m_lambda = std::max(1.0f, lambda);
+    m_options = options;
+    m_options.minClusterCnt = std::min(static_cast<int>(m_mesh.n_faces()), m_options.minClusterCnt);
+    m_options.maxIteration = std::max(0, m_options.maxIteration);
+    m_options.normalWeight = std::max(1.0f, m_options.normalWeight);
 
-    m_maxIterCnt = maxIter;
-    m_restIterCnt = maxIter;
+    m_maxIterCnt = m_options.maxIteration;
+    m_restIterCnt = m_options.maxIteration;
 
     InitSeed();
+
     return true;
 }
 
@@ -67,7 +74,6 @@ bool IterativeCluster::UpdateCluster()
 
     m_prevSeeds = m_seeds;
 
-
     m_newSeeds.clear();
     //auto lastFace = RegionGrow();
     auto lastFace = RegionGrowSync(m_newSeeds);
@@ -75,7 +81,7 @@ bool IterativeCluster::UpdateCluster()
     //UpdateClusterCentersByPos();
 
     if (m_newSeeds.empty()) {
-        if (m_seeds.size() < m_clusterCount) {
+        if (m_seeds.size() < m_options.minClusterCnt) {
             AddSeed(lastFace);
         }
     } else {
@@ -89,6 +95,7 @@ bool IterativeCluster::UpdateCluster()
 
     m_restIterCnt -= 1;
 
+#if ENABLE_LOG
     std::cout << "iteration: " << m_maxIterCnt - m_restIterCnt << "\n\n" << std::endl;
     std::cout << "iterative count: " << m_maxIterCnt - m_restIterCnt << std::endl;
     std::cout << "IterativeCluster: " << m_seeds.size() << " clusters" << std::endl;
@@ -103,6 +110,7 @@ bool IterativeCluster::UpdateCluster()
         std::cout << m_seeds[i].idx() << " ";
     }
     std::cout << std::endl;
+#endif
 
     return true;
 }
@@ -111,81 +119,6 @@ void IterativeCluster::InitSeed()
 {
     m_seeds.clear();
     m_seeds.push_back(m_mesh.face_handle(0));
-}
-
-Mesh::FaceHandle IterativeCluster::RegionGrow()
-{
-    std::vector<PriorityQueue> queues(m_seeds.size());
-    ClearClusterProp();
-
-    std::vector<OpenMesh::FProp<bool>> visitedProps;
-    for (int i = 0; i < m_seeds.size(); ++ i) {
-        visitedProps.emplace_back(m_mesh);
-    }
-
-    for (int i = 0; i < m_seeds.size(); ++ i) {
-        auto seed = m_seeds[i];
-        m_clusterProp[seed] = i;
-        queues[i].emplace(0.0f, seed);
-
-        visitedProps[i][seed] = true;
-    }
-    m_clusterNormals = std::vector<Mesh::Normal>(m_seeds.size(), Mesh::Normal(0, 0, 0));
-
-    Mesh::FaceHandle lastFace;
-
-    while (true) {
-        bool notEmpty = false;
-
-        for (int clusterId = 0; clusterId < m_seeds.size(); ++ clusterId) {
-            auto& queue = queues[clusterId];
-
-            if (queue.empty())
-                continue;
-
-            Item item = queue.top();
-            while (true) {
-                item = queue.top();
-                queue.pop();
-
-                if (m_clusterProp[item.handle] == clusterId || m_clusterProp[item.handle] == kInvalidClusterId)
-                    break;
-
-                if (queue.empty())
-                    break;
-            }
-
-            auto face = item.handle;
-            lastFace = face;
-            m_clusterProp[face] = clusterId;
-
-            if (clusterId == 0) {
-                //std::cout << "f: " << face.idx() << " cost: " << item.cost << std::endl;
-            }
-
-            // Note：更新chart的法线
-            m_clusterNormals[clusterId] += m_mesh.normal(face);
-            m_clusterNormals[clusterId].normalize();
-
-            for (auto fh : m_mesh.ff_range(face)) {
-                if (m_clusterProp[fh] != kInvalidClusterId)
-                    continue;
-
-                if (visitedProps[clusterId][fh])
-                    continue;
-
-                auto cost = CalculateCost(m_clusterNormals[clusterId], face, fh);
-                queue.emplace(cost, fh);
-                visitedProps[clusterId][fh] = true;
-            }
-
-            notEmpty = true;
-        }
-
-        if (!notEmpty)
-            break;
-    }
-    return lastFace;
 }
 
 Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>& newSeeds)
@@ -222,7 +155,6 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>&
     m_clusterNormals = std::vector<Mesh::Normal>(seedCount, Mesh::Normal(0, 0, 0));
 
     int count = 0;
-
     Mesh::FaceHandle lastFace;
     while (!queue.empty()) {
         auto item = queue.top();
@@ -238,7 +170,7 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>&
         }
 
         const int clusterId = item.clusterId;
-        if (m_options.maxArea > 0.0f && m_chartAreas[clusterId] > m_options.maxArea) {
+        if (m_options.maxChartArea > 0.0f && m_chartAreas[clusterId] > m_options.maxChartArea) {
             continue;
         }
 
@@ -323,7 +255,7 @@ float IterativeCluster::CalculateCost(const Mesh::Normal& chartNormal, const Mes
     auto rn = m_mesh.normal(newFace).normalized();
     auto n = chartNormal.dot(rn);
 
-    return (m_lambda - n) * d;
+    return (m_options.normalWeight - n) * d;
 }
 
 void IterativeCluster::ClearClusterProp()
@@ -406,36 +338,9 @@ Mesh::FaceHandle IterativeCluster::FindCenterOfMesh(const Mesh& mesh)
     return lastFace;
 }
 
-void IterativeCluster::UpdateClusterCentersByPos()
-{
-    for (int i = 0; i < m_seeds.size(); ++ i) {
-        auto mesh = GetClusterMesh(i);
-
-        OpenMesh::Vec3f center(0, 0, 0);
-        for (const auto fh : mesh.faces()) {
-            center += mesh.calc_face_centroid(fh);
-        }
-        center /= mesh.n_faces();
-
-        Mesh::FaceHandle seed;
-        float minDist = std::numeric_limits<float>::max();
-
-        for (const auto fh : mesh.faces()) {
-            auto fpos = mesh.calc_face_centroid(fh);
-            float dist = (fpos - center).length();
-
-            if (dist < minDist) {
-                minDist = dist;
-                seed = fh;
-            }
-        }
-        m_seeds[i] = seed;
-    }
-}
-
 bool IterativeCluster::IsConverged() const
 {
-    if (m_seeds.size() < m_clusterCount)
+    if (m_seeds.size() < m_options.minClusterCnt)
         return false;
 
     if (m_prevSeeds.size() != m_seeds.size())
