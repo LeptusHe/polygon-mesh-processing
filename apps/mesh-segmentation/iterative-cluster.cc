@@ -44,9 +44,9 @@ void IterativeCluster::Run(const IterativeCluster::Options& options)
 
 #if ENABLE_LOG
     if (m_restIterCnt == 0) {
-        std::cout << "IterativeCluster: reach max iteration count: " << m_options.maxIteration << std::endl;
+        std::cout << "IterativeCluster: reach max iteration count: " << m_options.maxIterationNum << std::endl;
     } else {
-        std::cout << "IterativeCluster: converge in " << m_options.maxIteration - m_restIterCnt << " iteration"  << std::endl;
+        std::cout << "IterativeCluster: converge in " << m_options.maxIterationNum - m_restIterCnt << " iteration"  << std::endl;
     }
 #endif
 }
@@ -55,11 +55,11 @@ bool IterativeCluster::Init(const IterativeCluster::Options& options)
 {
     m_options = options;
     m_options.minClusterCnt = std::min(static_cast<int>(m_mesh.n_faces()), m_options.minClusterCnt);
-    m_options.maxIteration = std::max(0, m_options.maxIteration);
+    m_options.maxIterationNum = std::max(0, m_options.maxIterationNum);
     m_options.normalWeight = std::max(1.0f, m_options.normalWeight);
 
-    m_maxIterCnt = m_options.maxIteration;
-    m_restIterCnt = m_options.maxIteration;
+    m_maxIterCnt = m_options.maxIterationNum;
+    m_restIterCnt = m_options.maxIterationNum;
 
     InitSeed();
 

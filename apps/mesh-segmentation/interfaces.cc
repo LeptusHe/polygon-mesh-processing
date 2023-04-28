@@ -1,7 +1,7 @@
 #include "interfaces.h"
 #include "common.h"
 #include "iterative-cluster.h"
-#include <cmath>
+#include <iostream>
 
 Mesh ConstructMesh(const float *vertices, int numVertices, const int *indices, int triangleNum)
 {
@@ -40,31 +40,51 @@ bool GetSegmentationResult(Mesh& mesh, OpenMesh::FProp<int>& clusterProp, int *c
     return true;
 }
 
-bool RunSegmentation(const Options& options, Mesh& mesh, int *clusterIds)
+IterativeCluster::Options InitOptions(const Options& options)
+{
+    IterativeCluster::Options opt;
+    opt.minClusterCnt = std::max(1, options.minClusterCount);
+    opt.maxChartArea = std::max(0.0f, options.maxChartArea);
+    opt.normalWeight = std::max(0.0f, options.normalWeight);
+    opt.maxIterationNum = std::max(1, options.maxIterationNum);
+    return opt;
+}
+
+bool RunSegmentation(const Options& options, Mesh& mesh, int *clusterIds, int& clusterCnt)
 {
     if (clusterIds == nullptr)
         return false;
 
-    IterativeCluster::Options opt;
-    //opt.maxChartArea = std::max(0.0f, options.maxChartArea);
+    auto opt = InitOptions(options);
+    OpenMesh::FProp<int> clusterProp(mesh, "cluster");
 
-    //OpenMesh::FProp<int> clusterProp(mesh, "cluster");
+    try {
+        IterativeCluster cluster(mesh, clusterProp);
+        cluster.Run(opt);
 
-    //IterativeCluster cluster(mesh, clusterProp, options);
+        clusterCnt = static_cast<int>(cluster.GetClusterCount());
+    } catch (std::exception& e) {
+        std::cerr << "failed to run segmentation: " << e.what() << std::endl;
+        clusterCnt = -1;
+        return false;
+    }
 
-    //cluster.Init()
-    //cluster.Run();
-
-    //return GetSegmentationResult(mesh, clusterProp, clusterIds);
-    return true;
+    return GetSegmentationResult(mesh, clusterProp, clusterIds);
 }
 
-bool Segmentation(Options options, const float *vertices, int numVertices, const int *indices, int triangleNum, const int *clusterIds)
+int MeshSegmentation(Options options, const float vertices[], int numVertices, const int indices[], int triangleNum, int clusterIds[])
 {
     if (vertices == nullptr || indices == nullptr || clusterIds == nullptr)
         return false;
 
     auto mesh = ConstructMesh(vertices, numVertices, indices, triangleNum);
-    //RunSegmentation(mesh, clusterIds);
-    return true;
+
+
+    int clusterCnt = -1;
+    auto success = RunSegmentation(options, mesh, clusterIds, clusterCnt);
+    if (success) {
+        return clusterCnt;
+    } else {
+        return -1;
+    }
 }

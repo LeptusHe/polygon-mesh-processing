@@ -84,12 +84,12 @@ int interactive(int argc, char *argv[])
     IterativeCluster::Options options;
     options.maxChartArea = 100.0f;
     options.minClusterCnt = std::ceil(area / options.maxChartArea);
-    options.maxIteration = maxIteration;
+    options.maxIterationNum = maxIteration;
     options.normalWeight = 1.05f;
 
     cluster.Init(options);
-    //cluster.Init(clusterCnt, 1.1f, maxIteration);
-    //cluster.Run(minClusterCnt, 1., maxIteration);
+    //cluster.Init(clusterCnt, 1.1f, maxIterationNum);
+    //cluster.Run(minClusterCnt, 1., maxIterationNum);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();
@@ -138,7 +138,7 @@ int interactive(int argc, char *argv[])
         menu.draw_viewer_menu();
 
         if (ImGui::InputInt("max iteration", &maxIteration)) {
-            options.maxIteration = maxIteration;
+            options.maxIterationNum = maxIteration;
 
             cluster.Run(options);
             set_color_to_mesh();
@@ -188,7 +188,7 @@ int interactive(int argc, char *argv[])
     viewer.callback_key_down = [&](igl::opengl::glfw::Viewer& viewer, unsigned char key, int mod) {
         if (key == 'N') {
             maxIteration += 1;
-            options.maxIteration = maxIteration;
+            options.maxIterationNum = maxIteration;
 
             cluster.Run(options);
             set_color_to_mesh();

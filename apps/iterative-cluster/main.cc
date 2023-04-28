@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     int maxIteration = 100;
 
     cluster.Init(clusterCnt, 1.0f, maxIteration);
-    //cluster.Run(clusterCnt, 1., maxIteration);
+    //cluster.Run(clusterCnt, 1., maxIterationNum);
 
     //cluster.InitSeed();
     //cluster.RegionGrow();

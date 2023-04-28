@@ -5,7 +5,7 @@ class IterativeCluster {
 public:
     struct Options {
         int minClusterCnt = 1;
-        int maxIteration = 100;
+        int maxIterationNum = 100;
         float maxChartArea = 0.0f;
         float normalWeight = 1.05f;
     };
