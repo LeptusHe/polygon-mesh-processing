@@ -8,6 +8,9 @@
 #include <Eigen/SparseQR>
 #include <exception>
 #include <filesystem>
+#include <igl/harmonic.h>
+#include "MeshIO.h"
+#include <OpenMesh/Core/Utils/PropertyManager.hh>
 
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
@@ -57,6 +60,45 @@ Eigen::Vector2d ConvertToCircleUV(double s)
     double v = std::cos(theta);
     return {u, v};
 }
+
+Eigen::MatrixXd FixBoundary(const Mesh& mesh, std::vector<OpenMesh::VertexHandle>& boundaryVertices)
+{
+    int boundaryVertCnt = 0;
+    for (auto vh: mesh.vertices()) {
+        if (!vh.is_boundary())
+            continue;
+
+        boundaryVertCnt += 1;
+    }
+
+    OpenMesh::HalfedgeHandle start;
+    for (auto eh: mesh.halfedges()) {
+        if (eh.is_boundary()) {
+            start = eh;
+        }
+    }
+
+    auto cur = start;
+    while (true) {
+        auto vh = mesh.to_vertex_handle(cur);
+        boundaryVertices.push_back(vh);
+
+        auto next = mesh.next_halfedge_handle(cur);
+        if (next == start)
+            break;
+
+        cur = next;
+    }
+
+    Eigen::MatrixXd boundaryUV(boundaryVertices.size(), 2);
+    for (int i = 0; i < boundaryVertices.size(); ++i) {
+        double val = static_cast<double>(i) / static_cast<double>(boundaryVertices.size());
+        auto uv = ConvertToCircleUV(val);
+        boundaryUV.row(i) = uv;
+    }
+    return boundaryUV;
+}
+
 
 Eigen::MatrixXd FixBoundary(const Eigen::MatrixXd& V, const std::vector<int>& boundaryVertList)
 {
@@ -124,11 +166,107 @@ std::vector<TexMat> GenerateGridTex(Eigen::Vector3d colorA, Eigen::Vector3d colo
     //viewer.data().set_texture()
 }
 
+float CalculateTanTheta(OpenMesh::Vec3f& e0, OpenMesh::Vec3f e1)
+{
+    auto cosTheta = e0.dot(e1) / (e0.norm() * e1.norm());
+    auto theta = std::acos(cosTheta);
+    return std::tan(theta / 2.0f);
+}
+
+float CalculateWeight(const Mesh& mesh, OpenMesh::HalfedgeHandle prev, OpenMesh::HalfedgeHandle cur)
+{
+    auto v0 = mesh.from_vertex_handle(prev);
+    auto v1 = mesh.to_vertex_handle(prev);
+    auto v2 = mesh.to_vertex_handle(cur);
+
+    auto p0 = mesh.point(v0);
+    auto p1 = mesh.point(v1);
+    auto p2 = mesh.point(v2);
+
+    auto e0 = p0 - p1;
+    auto e1 = p2 - p1;
+    auto tanTheta0 = CalculateTanTheta(e0, e1);
+    return tanTheta0;
+}
+
+void CalculateMeanValueWeight(Mesh& mesh, OpenMesh::HProp<float>& weightProp)
+{
+    for (auto vh : mesh.vertices()) {
+        if (vh.is_boundary())
+            continue;
+
+        auto sum = 0.0f;
+        for (auto eh : mesh.voh_range(vh)) {
+            auto prev = eh.prev();
+            auto tanTheta0 = CalculateWeight(mesh, prev, eh);
+
+            prev = eh.opp();
+            auto cur = prev.next();
+            auto tanTheta1 = CalculateWeight(mesh, prev, cur);
+
+            auto p0 = mesh.point(mesh.from_vertex_handle(eh));
+            auto p1 = mesh.point(mesh.to_vertex_handle(eh));
+            auto weight = (tanTheta0 + tanTheta1) / (p1 - p0).length();
+
+            weightProp[eh] = weight;
+            sum += weight;
+        }
+
+        for (auto eh : mesh.voh_range(vh)) {
+            auto weight = weightProp[eh];
+            weightProp[eh] = weight / sum;
+        }
+    }
+}
+
+Eigen::SparseMatrix<double> Solve(Mesh& mesh, const std::vector<OpenMesh::VertexHandle> boundaryVertices, Eigen::MatrixXd boundaryUV)
+{
+    auto weightProp = OpenMesh::HProp<float>(mesh, "weight");
+    CalculateMeanValueWeight(mesh, weightProp);
+
+    Eigen::SparseMatrix<double> A = Eigen::SparseMatrix<double>(V.rows(), V.rows());
+    A.setZero();
+    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(V.rows(), 2);
+
+    for (int i = 0; i < boundaryVertices.size(); ++ i) {
+        auto vh = boundaryVertices[i];
+        auto idx = vh.idx();
+
+        auto uv = boundaryUV.row(i);
+        b.row(idx) = uv;
+    }
+
+    for (auto vh : mesh.vertices()) {
+        if (vh.is_boundary()) {
+            A.insert(vh.idx(), vh.idx()) = 1;
+        } else {
+            A.insert(vh.idx(), vh.idx()) = 0;
+
+            for (auto adjacencyVertex : mesh.vv_range(vh)) {
+                auto eh = mesh.find_halfedge(vh, adjacencyVertex);
+                float weight = weightProp[eh];
+
+                A.insert(vh.idx(), adjacencyVertex.idx()) = weight;
+                A.coeffRef(vh.idx(), vh.idx()) -= weight;
+            }
+        }
+    }
+    return A;
+}
+
 
 int main(int argc, char *argv[])
 {
     auto path = argc > 1 ? argv[1] : "data/beetle.obj";
-    //auto path = argc > 1 ? argv[1] : "data/quad.obj";
+
+    Mesh mesh;
+    OpenMesh::IO::Options opt;
+
+    if (!meshlib::LoadMesh(path, mesh, opt))
+        return -1;
+    mesh.request_vertex_texcoords2D();
+
+
     if (!igl::read_triangle_mesh(path, V, F)) {
         std::cout << fmt::format("failed to load mesh: [{0}]", path);
         return -1;
@@ -137,18 +275,12 @@ int main(int argc, char *argv[])
         std::cout << fmt::format("face count: {}\n", F.rows());
     }
 
-#if ENABLE_DEBUG
-    std::cout << "vertex: " << std::endl;
-    std::cout << V << std::endl;
-
-    std::cout << "faces:" << std::endl;
-    std::cout << F << std::endl;
-#endif
-
     std::vector<int> boundaryVertIndexList;
     igl::boundary_loop(F, boundaryVertIndexList);
 
+    std::vector<OpenMesh::VertexHandle> boundaryVertices;
     auto boundaryUV = FixBoundary(V, boundaryVertIndexList);
+    auto meshBoundaryUV = FixBoundary(mesh, boundaryVertices);
 
     Eigen::MatrixXd colorData = Eigen::MatrixXd::Zero(V.rows(), 3);
     int cnt = 0;
@@ -183,6 +315,7 @@ int main(int argc, char *argv[])
     }
 
     Eigen::SparseMatrix<double> A = Eigen::SparseMatrix<double>(V.rows(), V.rows());
+    A.setZero();
     Eigen::MatrixXd b = Eigen::MatrixXd::Zero(V.rows(), 2);
 
     for (int i = 0; i < boundaryVertIndexList.size(); ++ i) {
@@ -201,13 +334,46 @@ int main(int argc, char *argv[])
 
             bool isBoundaryVert = boundaryVertexSet.find(l) != std::end(boundaryVertexSet);
             if (isBoundaryVert) {
-                A.coeffRef(l, l) = 1;
+                //A.coeffRef(l, l) = 1;
             } else {
-                A.coeffRef(l, r) = 1;
-                A.coeffRef(l, l) -= 1;
+                //A.coeffRef(l, r) = 1;
+                //A.coeffRef(l, l) -= 1;
             }
         }
     }
+
+    std::vector<std::vector<int>> vertexAdjacencyList;
+    igl::adjacency_list(F, vertexAdjacencyList);
+    for (int i = 0; i < V.rows(); ++ i) {
+        const auto& adjacencyList = vertexAdjacencyList[i];
+
+        bool isBoundaryVert = boundaryVertexSet.find(i) != std::end(boundaryVertexSet);
+        if (isBoundaryVert) {
+            A.insert(i, i) = 1;
+            continue;
+        }
+
+        A.insert(i, i) = 0;
+        for (int adjacencyIndex : adjacencyList) {
+            A.insert(i, adjacencyIndex) = 1;
+            A.coeffRef(i, i) -= 1;
+
+            //std::cout << A.coeff(i, adjacencyIndex) << std::endl;
+            //std::cout << A.coeff(i, adjacencyIndex) << std::endl;
+        }
+    }
+
+    A = Solve(mesh, boundaryVertices, meshBoundaryUV);
+
+    for (int i = 0; i < A.rows(); ++ i) {
+        for (int j = 0; j < A.cols(); ++ j) {
+            if (A.coeff(i, j) != 0) {
+                //std::cout << A.coeffRef(i, j) << ", ";
+            }
+        }
+        //std::cout << std::endl;
+    }
+    //std::cout << A << std::endl;
 
 #if ENABLE_DEBUG
     std::cout << "A: " << std::endl;
@@ -235,6 +401,10 @@ int main(int argc, char *argv[])
     std::cout << "solve: " << std::endl;
     std::cout << U << std::endl;
 #endif
+
+    //Eigen::VectorXi bnd;
+    //igl::boundary_loop(F, bnd);
+    //igl::harmonic(V, F, bnd, boundaryUV, 1, U);
 
     Eigen::MatrixXd scaleUV = 10 * U;
     auto texList = GenerateGridTex(Eigen::Vector3d{1, 1, 1}, Eigen::Vector3d{0.5, 0.0, 0.0});
