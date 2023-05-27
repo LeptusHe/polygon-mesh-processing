@@ -189,11 +189,14 @@ float CalculateWeight(const Mesh& mesh, OpenMesh::HalfedgeHandle prev, OpenMesh:
     return tanTheta0;
 }
 
-void CalculateMeanValueWeight(Mesh& mesh, OpenMesh::HProp<float>& weightProp)
+void CalculateMeanValueWeight(Mesh& mesh, OpenMesh::HProp<float>& weightProp, const std::unordered_set<OpenMesh::VertexHandle>& boundaryVertices)
 {
     for (auto vh : mesh.vertices()) {
-        if (vh.is_boundary())
+        if (boundaryVertices.find(vh) != std::end(boundaryVertices))
             continue;
+
+        //if (vh.is_boundary())
+        //    continue;
 
         auto sum = 0.0f;
         for (auto eh : mesh.voh_range(vh)) {
@@ -219,10 +222,22 @@ void CalculateMeanValueWeight(Mesh& mesh, OpenMesh::HProp<float>& weightProp)
     }
 }
 
-Eigen::SparseMatrix<double> Solve(Mesh& mesh, const std::vector<OpenMesh::VertexHandle> boundaryVertices, Eigen::MatrixXd boundaryUV)
+std::unordered_set<OpenMesh::VertexHandle> GetBoundaryVertexSet(const std::vector<OpenMesh::VertexHandle>& boundaryVertices)
+{
+    std::unordered_set<OpenMesh::VertexHandle> set;
+    for (const auto vertex : boundaryVertices) {
+        set.insert(vertex);
+    }
+    return set;
+}
+
+
+Eigen::SparseMatrix<double> Solve(Mesh& mesh, const std::vector<OpenMesh::VertexHandle>& boundaryVertices, Eigen::MatrixXd boundaryUV)
 {
     auto weightProp = OpenMesh::HProp<float>(mesh, "weight");
-    CalculateMeanValueWeight(mesh, weightProp);
+
+    auto boundaryVertexSet = GetBoundaryVertexSet(boundaryVertices);
+    CalculateMeanValueWeight(mesh, weightProp, boundaryVertexSet);
 
     Eigen::SparseMatrix<double> A = Eigen::SparseMatrix<double>(V.rows(), V.rows());
     A.setZero();
@@ -237,7 +252,7 @@ Eigen::SparseMatrix<double> Solve(Mesh& mesh, const std::vector<OpenMesh::Vertex
     }
 
     for (auto vh : mesh.vertices()) {
-        if (vh.is_boundary()) {
+        if (boundaryVertexSet.find(vh) != std::end(boundaryVertexSet)) {
             A.insert(vh.idx(), vh.idx()) = 1;
         } else {
             A.insert(vh.idx(), vh.idx()) = 0;
@@ -245,6 +260,7 @@ Eigen::SparseMatrix<double> Solve(Mesh& mesh, const std::vector<OpenMesh::Vertex
             for (auto adjacencyVertex : mesh.vv_range(vh)) {
                 auto eh = mesh.find_halfedge(vh, adjacencyVertex);
                 float weight = weightProp[eh];
+                //weight = 1.0f;
 
                 A.insert(vh.idx(), adjacencyVertex.idx()) = weight;
                 A.coeffRef(vh.idx(), vh.idx()) -= weight;
@@ -275,12 +291,17 @@ int main(int argc, char *argv[])
         std::cout << fmt::format("face count: {}\n", F.rows());
     }
 
-    std::vector<int> boundaryVertIndexList;
-    igl::boundary_loop(F, boundaryVertIndexList);
+    //std::vector<int> boundaryVertIndexList;
+    //igl::boundary_loop(F, boundaryVertIndexList);
 
     std::vector<OpenMesh::VertexHandle> boundaryVertices;
-    auto boundaryUV = FixBoundary(V, boundaryVertIndexList);
-    auto meshBoundaryUV = FixBoundary(mesh, boundaryVertices);
+    //auto boundaryUV = FixBoundary(V, boundaryVertIndexList);
+    auto boundaryUV = FixBoundary(mesh, boundaryVertices);
+
+    std::vector<int> boundaryVertIndexList;
+    for (const auto& index : boundaryVertices) {
+        boundaryVertIndexList.push_back(index.idx());
+    }
 
     Eigen::MatrixXd colorData = Eigen::MatrixXd::Zero(V.rows(), 3);
     int cnt = 0;
@@ -363,7 +384,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    A = Solve(mesh, boundaryVertices, meshBoundaryUV);
+    A = Solve(mesh, boundaryVertices, boundaryUV);
 
     for (int i = 0; i < A.rows(); ++ i) {
         for (int j = 0; j < A.cols(); ++ j) {
@@ -402,9 +423,9 @@ int main(int argc, char *argv[])
     std::cout << U << std::endl;
 #endif
 
-    //Eigen::VectorXi bnd;
-    //igl::boundary_loop(F, bnd);
-    //igl::harmonic(V, F, bnd, boundaryUV, 1, U);
+    Eigen::VectorXi bnd;
+    igl::boundary_loop(F, bnd);
+    //igl::harmonic(V, F, bnd, boundaryUV, 2, U);
 
     Eigen::MatrixXd scaleUV = 10 * U;
     auto texList = GenerateGridTex(Eigen::Vector3d{1, 1, 1}, Eigen::Vector3d{0.5, 0.0, 0.0});
