@@ -12,6 +12,9 @@
 #include <utility>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
+#include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
+#include <OpenMesh/Tools/Decimater/ModNormalFlippingT.hh>
+#include <OpenMesh/Tools/Decimater/MixedDecimaterT.hh>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 using Item = std::pair<double, Mesh::EdgeHandle>;
@@ -242,11 +245,28 @@ int main(int argc, char *argv[])
         return false;
     };
 
+
+    for (auto he : mesh.halfedges()) {
+        if (!he.is_boundary())
+            continue;
+
+        auto vf = mesh.from_vertex_handle(he);
+        auto vt = mesh.to_vertex_handle(he);
+
+        mesh.status(vf).set_locked(true);
+        mesh.status(vt).set_locked(true);
+    }
+
     Decimater decimater(mesh);
+    //OpenMesh::Decimater::MixedDecimaterT<Mesh> decimater(mesh);
+    OpenMesh::Decimater::ModNormalFlippingT<Mesh>::Handle modNormalFlipping;
+
     HModQuadric modQuadric;
     decimater.add(modQuadric);
+    decimater.add(modNormalFlipping);
     decimater.initialize();
-    decimater.decimate_to(100);
+    int count = decimater.decimate(10000);
+    std::cout << "decimate count: " << count << std::endl;
 
     mesh.garbage_collection();
 
