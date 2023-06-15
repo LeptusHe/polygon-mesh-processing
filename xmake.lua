@@ -234,3 +234,12 @@ target("10-parametrization-lscm")
     add_packages(packages)
     add_includedirs(include_dirs)
     add_deps("meshlib")
+
+
+target("11-remesh")
+    set_languages("c++17")
+    set_kind("binary")
+    add_files("apps/remesh/*.cc")
+    add_packages(packages)
+    add_includedirs(include_dirs)
+    add_deps("meshlib")
