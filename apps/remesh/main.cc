@@ -4,6 +4,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
+#include <OpenMesh/Core/Utils/PropertyManager.hh>
 #include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include "MeshUtils.h"
@@ -38,6 +39,58 @@ void SplitLongEdges(Mesh& mesh, float target_edge_length)
 {
     while (true) {
         if (!SplitOneLongEdge(mesh, target_edge_length)) {
+            break;
+        }
+    }
+}
+
+bool CollapseOneShortEdge(Mesh& mesh, float short_len_threshold, float long_len_threshold)
+{
+    OpenMesh::EdgeHandle e;
+    for (auto edge : mesh.edges()) {
+        if (edge.is_boundary())
+            continue;
+
+        auto v0 = edge.vertex(0);
+        auto v1 = edge.vertex(1);
+        if (v0.is_boundary() || v1.is_boundary())
+            continue;
+
+        if (mesh.calc_edge_length(edge) < short_len_threshold) {
+            e = edge;
+            break;
+        }
+    }
+
+    if (!e.is_valid()) {
+        return false;
+    }
+
+    auto hf = mesh.halfedge_handle(e, 0);
+    auto v0 = mesh.from_vertex_handle(hf);
+    auto v1 = mesh.to_vertex_handle(hf);
+
+    bool collapse_ok = true;
+    auto p1 = mesh.point(v1);
+    for (auto vh : mesh.vv_range(v0)) {
+        auto p0 = mesh.point(vh);
+        if ((p0 - p1).norm()  > long_len_threshold) {
+            collapse_ok = false;
+            break;
+        }
+    }
+
+    if (collapse_ok && mesh.is_collapse_ok(hf)) {
+        mesh.collapse(hf);
+        return true;
+    }
+    return false;
+}
+
+void CollapseShortEdge(Mesh& mesh, float short_len_threshold, float long_len_threshold)
+{
+    while (true) {
+        if (!CollapseOneShortEdge(mesh, short_len_threshold, long_len_threshold)) {
             break;
         }
     }
@@ -92,14 +145,21 @@ void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
         deviation_post += std::abs(valence - target_valence);
     }
 
+    auto hf = mesh.find_halfedge(v2, v3);
+    if (!hf.is_valid()) {
+        std::cout << "failed to find halfedge" << std::endl;
+        return;
+    }
+
     // note: 相等时不要flip，很重要
     if (deviation_post >= deviation_pre) {
-        if (!mesh.is_flip_ok(edge)) {
+        auto fliped_edge = mesh.edge_handle(hf);
+        if (!mesh.is_flip_ok(fliped_edge)) {
             std::cout << "failed to reflip edge" << std::endl;
             return;
         }
 
-        mesh.flip(edge);
+        mesh.flip(fliped_edge);
     }
 }
 
@@ -116,13 +176,44 @@ void EqualizeValences(Mesh& mesh)
     }
 }
 
+void TangentialRelaxation(Mesh& mesh, OpenMesh::VProp<OpenMesh::Vec3f>& prop)
+{
+    for (auto vh : mesh.vertices()) {
+        if (mesh.is_boundary(vh))
+            continue;
+
+        int n = 0;
+        OpenMesh::Vec3f q(0, 0, 0);
+        for (auto adj_vh : mesh.vv_range(vh)) {
+            q += mesh.point(adj_vh);
+            n += 1;
+        }
+        q = q / n;
+
+        prop[vh] = q;
+    }
+
+    for (auto vh : mesh.vertices()) {
+        // note: 是否要对边界顶点进行处理?
+        if (mesh.is_boundary(vh))
+            continue;
+
+        auto q = prop[vh];
+        auto p = mesh.point(vh);
+        auto normal = mesh.calc_normal(vh);
+
+        auto new_point = q + normal.dot(p - q) * normal;
+        mesh.set_point(vh, new_point);
+    }
+}
+
 
 int main(int argc, char *argv[])
 {
     auto path = argc > 1 ? argv[1] : "data/quad.obj";
 
     Mesh mesh;
-    OpenMesh::IO::Options opt;
+    OpenMesh::IO::Options opt = OpenMesh::IO::Options::VertexNormal;
     if (!OpenMesh::IO::read_mesh(mesh, path, opt)) {
         std::cerr << "failed to load mesh from " << path << std::endl;
         return 1;
@@ -134,23 +225,17 @@ int main(int argc, char *argv[])
     mesh.request_vertex_status();
     mesh.request_edge_status();
     mesh.request_face_status();
+    mesh.request_halfedge_normals();
 
-
-    /*
-    std::filesystem::create_directories("data/result/");
-    try {
-
-        if (!OpenMesh::IO::write_mesh(mesh, "data/result/openmesh.obj")) {
-            std::cerr << fmt::format("failed to write mesh to [{0}]", path) << std::endl;
-            return 1;
-        } else {
-            std::cout << fmt::format("succeed to write mesh to [{0}]", path) << std::endl;
-        }
-    } catch (std::exception& e) {
-        std::cerr << fmt::format("failed to write mesh because [{0}]", e.what()) << std::endl;
-        return 1;
+    if (!mesh.has_vertex_normals()) {
+        std::cerr << "the mesh has no vertex normals" << std::endl;
     }
-     */
+
+    mesh.request_vertex_normals();
+    mesh.request_face_normals();
+    mesh.update_normals();
+
+    auto prop_points = OpenMesh::VProp<OpenMesh::Vec3f>(mesh, "points");
 
     igl::opengl::glfw::Viewer viewer;
     viewer.data().label_size = 5.0f;
@@ -167,13 +252,29 @@ int main(int argc, char *argv[])
         menu.draw_viewer_menu();
 
         ImGui::InputFloat("target edge length", &target_edge_length);
+        auto short_edge_length = 4.0f / 5.0f * target_edge_length;
+        auto long_edge_length = 4.0f / 3.0f * target_edge_length;
+
+        ImGui::LabelText("short edge length", "%f", short_edge_length);
+        ImGui::LabelText("long edge length", "%f", long_edge_length);
+
         if (ImGui::Button("Split Long Edges")) {
-            SplitOneLongEdge(mesh, target_edge_length);
+            SplitOneLongEdge(mesh, long_edge_length);
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        }
+
+        if (ImGui::Button("Collapse Short Edges")) {
+            CollapseShortEdge(mesh, short_edge_length, long_edge_length);
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
         }
 
         if (ImGui::Button("Equalize Valences")) {
             EqualizeValences(mesh);
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        }
+
+        if (ImGui::Button("Tangential Relaxation")) {
+            TangentialRelaxation(mesh, prop_points);
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
         }
     };
