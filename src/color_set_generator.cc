@@ -1,4 +1,4 @@
-#include "ColorSetGenerator.h"
+#include "color_set_generator.h"
 #include <random>
 
 ColorSetGenerator::ColorSetGenerator(int colorCnt)

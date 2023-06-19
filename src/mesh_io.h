@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "MeshUtils.h"
+#include "mesh_utils.h"
 
 namespace meshlib {
 

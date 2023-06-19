@@ -4,10 +4,10 @@ find_package(Eigen3 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 add_library(meshlib STATIC
-        Mds.cc
-        MeshIO.cc
-        MeshUtils.cc
-        ColorSetGenerator.cc)
+    mds.cc
+    mesh_io.cc
+    mesh_utils.cc
+    color_set_generator.cc)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")
 target_compile_definitions(meshlib PUBLIC _USE_MATH_DEFINES)
