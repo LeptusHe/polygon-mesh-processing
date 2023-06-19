@@ -258,12 +258,13 @@ int main(int argc, char *argv[])
     }
 
     Decimater decimater(mesh);
-    //OpenMesh::Decimater::MixedDecimaterT<Mesh> decimater(mesh);
     OpenMesh::Decimater::ModNormalFlippingT<Mesh>::Handle modNormalFlipping;
 
     HModQuadric modQuadric;
     decimater.add(modQuadric);
     decimater.add(modNormalFlipping);
+    decimater.module(modNormalFlipping).set_max_normal_deviation(5.0f);
+
     decimater.initialize();
     int count = decimater.decimate(10000);
     std::cout << "decimate count: " << count << std::endl;
