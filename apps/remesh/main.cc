@@ -7,7 +7,7 @@
 #include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <imgui.h>
-#include "mesh_utils.h"
+#include "utils/mesh_utils.h"
 #include <spdlog/spdlog.h>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
