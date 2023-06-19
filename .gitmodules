@@ -1,0 +1,4 @@
+[submodule "externals/libigl"]
+	path = externals/libigl
+	url = https://github.com/libigl/libigl.git
+	branch = stable
