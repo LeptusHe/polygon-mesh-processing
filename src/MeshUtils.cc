@@ -1,5 +1,6 @@
 #include "MeshUtils.h"
 #include <Eigen/Eigen>
+#include <fmt/format.h>
 
 namespace meshlib {
 
@@ -23,6 +24,24 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
+    viewer.data().show_vertex_labels = true;
+}
+
+bool MeshUtils::WriteMesh(const Mesh &mesh, const std::string &path)
+{
+    try {
+        if (!OpenMesh::IO::write_mesh(mesh, path)) {
+            std::cerr << fmt::format("failed to write mesh to [{0}]", path) << std::endl;
+            return true;
+        } else {
+            std::cout << fmt::format("succeed to write mesh to [{0}]", path) << std::endl;
+            return false;
+        }
+    } catch (std::exception& e) {
+        std::cerr << fmt::format("failed to write mesh because [{0}]", e.what()) << std::endl;
+        return false;
+    }
+    return true;
 }
 
 } // namespace meshlib

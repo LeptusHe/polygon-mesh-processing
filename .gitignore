@@ -7,7 +7,6 @@ logs/*
 # Jetbrains
 .idea/*
 cmake-build-*/*
-CMakeLists.txt
 
 # Xmake
 .xmake/*

@@ -10,6 +10,7 @@ namespace meshlib {
 class MeshUtils {
 public:
     static void ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer& viewer);
+    static bool WriteMesh(const Mesh& mesh, const std::string& path);
 };
 
 } // namespace meshlib
