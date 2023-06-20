@@ -2,6 +2,7 @@ find_package(openmesh REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(CGAL CONFIG REQUIRED)
 
 add_library(meshlib STATIC
     parameterization/mds.cc
@@ -19,6 +20,7 @@ target_include_directories(meshlib PUBLIC
 
 target_link_libraries(meshlib PUBLIC
     ${OPENMESH_LIBRARIES}
+    CGAL::CGAL
     igl::core
     igl::opengl
     igl::glfw
