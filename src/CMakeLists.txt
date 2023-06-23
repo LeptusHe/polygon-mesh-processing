@@ -8,6 +8,7 @@ add_library(meshlib STATIC
     parameterization/mds.cc
     utils/mesh_io.cc
     utils/mesh_utils.cc
+    remesh/remesher.cpp
     visualization/color_set_generator.cc)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")

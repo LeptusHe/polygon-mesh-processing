@@ -24,7 +24,30 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
-    viewer.data().show_vertex_labels = true;
+}
+
+void MeshUtils::ConvertMeshToViewer(const CMesh& mesh, igl::opengl::glfw::Viewer& viewer)
+{
+    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.vertices().size(), 3);
+    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.faces().size(), 3);
+
+    for (auto vh : mesh.vertices()) {
+        auto vert = mesh.point(vh);
+        V.row(vh.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+    }
+
+    for (auto fh : mesh.faces()) {
+        auto fvIter = mesh.vertices_around_face(mesh.halfedge(fh));
+
+        auto index = 0;
+        for (auto v : fvIter) {
+            F(fh.idx(), index) = v.idx();
+            index += 1;
+        }
+    }
+
+    viewer.data().clear();
+    viewer.data().set_mesh(V, F);
 }
 
 bool MeshUtils::WriteMesh(const Mesh &mesh, const std::string &path)

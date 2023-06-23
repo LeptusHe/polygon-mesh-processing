@@ -8,9 +8,19 @@
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <imgui.h>
 #include "utils/mesh_utils.h"
+#include "remesh/remesher.h"
 #include <spdlog/spdlog.h>
 
+#include <boost/bimap.hpp>
+#include <boost/bimap/set_of.hpp>
+#include <boost/bimap/multiset_of.hpp>
+
+#include <CGAL/polygon_mesh_processing/remesh.h>
+#include <igl/file_dialog_open.h>
+
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
+
+#define ENABLE_DEBUG_LOG 1
 
 void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
 {
@@ -43,6 +53,30 @@ bool SplitOneLongEdge(Mesh& mesh, float target_edge_length)
 
 void SplitLongEdges(Mesh& mesh, float target_edge_length)
 {
+    using Bimap = boost::bimap<
+            boost::bimaps::set_of<OpenMesh::EdgeHandle>,
+            boost::bimaps::multiset_of<float, std::greater<>>>;
+    using long_edge = Bimap::value_type;
+
+    float squared_len_high = target_edge_length * target_edge_length;
+    Bimap long_edges;
+    for (auto eh : mesh.edges()) {
+        float squared_len = mesh.calc_edge_sqr_length(eh);
+        if (squared_len > squared_len_high) {
+            long_edges.insert(long_edge(eh, squared_len));
+        }
+    }
+
+    while (!long_edges.empty()) {
+        auto e_iter = long_edges.right.begin();
+        auto eh = e_iter->second;
+        long_edges.right.erase(e_iter);
+
+        auto mid_point = mesh.calc_edge_midpoint(eh);
+        mesh.split(eh, mid_point);
+    }
+    return;
+
     while (true) {
         if (!SplitOneLongEdge(mesh, target_edge_length)) {
             break;
@@ -108,6 +142,82 @@ void CollapseShortEdge(Mesh& mesh, float short_len_threshold, float long_len_thr
     }
 }
 
+bool CollapseHalfEdge(Mesh& mesh, const OpenMesh::HalfedgeHandle& he, float long_edge_sqr_len)
+{
+    auto v0 = mesh.from_vertex_handle(he);
+    auto v1 = mesh.to_vertex_handle(he);
+    auto p1 = mesh.point(v1);
+
+    bool collapse_ok = true;
+    for (auto vh : mesh.voh_range(v0)) {
+        auto sqr_dist = (p1 - mesh.point(mesh.to_vertex_handle(vh))).sqrnorm();
+
+        if ((sqr_dist > long_edge_sqr_len)
+            || (mesh.status(mesh.edge_handle(vh)).feature())
+            || (mesh.is_boundary(mesh.edge_handle(vh)))) {
+            collapse_ok = false;
+            break;
+        }
+    }
+
+    if (collapse_ok && mesh.is_collapse_ok(he)) {
+        mesh.collapse(he);
+        return true;
+    }
+    return false;
+}
+
+void CollapseShortEdges(Mesh& mesh, float short_edge_len, float long_edge_len)
+{
+    const float short_edge_sqr_len = short_edge_len * short_edge_len;
+    const float long_edge_sqr_len = long_edge_len * long_edge_len;
+
+    OpenMesh::EPropHandleT<bool> visited;
+    auto visited_property_name = "visited-prop";
+    if (!mesh.get_property_handle(visited, visited_property_name)) {
+        mesh.add_property(visited, visited_property_name);
+    }
+
+    for (auto edge : mesh.edges()) {
+        mesh.property(visited, edge) = false;
+    }
+
+    while (true) {
+        bool generate_new_edge = false;
+
+        for (auto iter = mesh.edges_begin(); iter != mesh.edges_end(); ++ iter) {
+            if (mesh.property(visited, *iter))
+                continue;
+
+            mesh.property(visited, *iter) = true;
+            auto sqr_len = mesh.calc_edge_sqr_length(*iter);
+
+            if ((sqr_len >= short_edge_sqr_len) || (sqr_len <= std::numeric_limits<float>::epsilon()))
+                continue;
+
+            auto he = mesh.halfedge_handle(*iter, 0);
+            auto oe = mesh.halfedge_handle(*iter, 1);
+
+            generate_new_edge = CollapseHalfEdge(mesh, he, long_edge_sqr_len);
+            if (!generate_new_edge) {
+                generate_new_edge = CollapseHalfEdge(mesh, oe, long_edge_sqr_len);
+            }
+        }
+
+        if (!generate_new_edge) {
+            break;
+        }
+    }
+
+    mesh.remove_property(visited);
+    mesh.garbage_collection();
+}
+
+int GetTargetValence(const Mesh& mesh, OpenMesh::VertexHandle vh)
+{
+    return mesh.is_boundary(vh) ? 4 : 6;
+}
+
 void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
 {
     auto hf0 = mesh.halfedge_handle(edge, 0);
@@ -127,13 +237,8 @@ void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
     int deviation_pre = 0;
     for (int i = 0; i < 4; i++) {
         auto vertex = vertices[i];
-
         int valence = static_cast<int>(mesh.valence(vertex));
-        int target_valence = 6;
-        if (mesh.is_boundary(vertex)) {
-            target_valence = 4;
-        }
-
+        int target_valence = GetTargetValence(mesh, vertex);
         deviation_pre += std::abs(valence - target_valence);
     }
 
@@ -149,18 +254,12 @@ void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
     int deviation_post = 0;
     for (int i = 0; i < 4; i++) {
         auto vertex = vertices[i];
-
         int valence = static_cast<int>(mesh.valence(vertex));
-        int target_valence = 6;
-        if (mesh.is_boundary(vertex)) {
-            target_valence = 4;
-        }
-
+        int target_valence = GetTargetValence(mesh, vertex);
         deviation_post += std::abs(valence - target_valence);
     }
 
-    auto hf = mesh.find_halfedge(v2, v3);
-    if (!hf.is_valid()) {
+    if (!edge.is_valid()) {
 #if ENABLE_DEBUG_LOG
         std::cout << "failed to find halfedge" << std::endl;
 #endif
@@ -169,8 +268,7 @@ void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
 
     // note: 相等时不要flip，很重要
     if (deviation_post >= deviation_pre) {
-        auto fliped_edge = mesh.edge_handle(hf);
-        if (!mesh.is_flip_ok(fliped_edge)) {
+        if (!mesh.is_flip_ok(edge)) {
 
 #if ENABLE_DEBUG_LOG
             std::cout << "failed to reflip edge" << std::endl;
@@ -179,7 +277,7 @@ void EqualizeValencesOfEdge(Mesh& mesh, OpenMesh::EdgeHandle edge)
             return;
         }
 
-        mesh.flip(fliped_edge);
+        mesh.flip(edge);
     }
 }
 
@@ -193,26 +291,32 @@ void EqualizeValences(Mesh& mesh)
             continue;
         }
 
-        // Note: 不对边界进行flip处理
-        if (mesh.is_boundary(edge))
+        if (!mesh.is_flip_ok(edge) || mesh.status(edge).feature())
             continue;
 
+#if ENABLE_DEBUG_LOG
         auto he = mesh.halfedge_handle(edge, 0);
-
-#if ENABLE_LOG
+        /*
         spdlog::info("equalize valences: face: {0}, edge: {1}, from: {2}, to: {3}",
                      mesh.face_handle(he).idx(),
                      edge.idx(),
                      mesh.from_vertex_handle(he).idx(),
                      mesh.to_vertex_handle(he).idx());
+        */
 #endif
 
         EqualizeValencesOfEdge(mesh, edge);
     }
 }
 
-void TangentialRelaxation(Mesh& mesh, OpenMesh::VProp<OpenMesh::Vec3f>& prop)
+void TangentialRelaxation(Mesh& mesh)
 {
+    OpenMesh::VPropHandleT<OpenMesh::Vec3f> point_prop;
+    const auto point_prop_name = "relaxation-point";
+    if (!mesh.get_property_handle(point_prop, point_prop_name)) {
+        mesh.add_property(point_prop, point_prop_name);
+    }
+
     for (auto vh : mesh.vertices()) {
         if (mesh.is_boundary(vh))
             continue;
@@ -225,7 +329,7 @@ void TangentialRelaxation(Mesh& mesh, OpenMesh::VProp<OpenMesh::Vec3f>& prop)
         }
         q = q / n;
 
-        prop[vh] = q;
+        mesh.property(point_prop, vh) = q;
     }
 
     for (auto vh : mesh.vertices()) {
@@ -233,7 +337,7 @@ void TangentialRelaxation(Mesh& mesh, OpenMesh::VProp<OpenMesh::Vec3f>& prop)
         if (mesh.is_boundary(vh))
             continue;
 
-        auto q = prop[vh];
+        auto q = mesh.property(point_prop, vh);
         auto p = mesh.point(vh);
         auto normal = mesh.calc_normal(vh);
 
@@ -251,27 +355,23 @@ void IncrementalRemesh(Mesh& mesh, OpenMesh::VProp<OpenMesh::Vec3f>& prop, float
         SplitLongEdges(mesh, long_edge_len);
         mesh.garbage_collection();
 
-        CollapseShortEdge(mesh, short_edge_len, long_edge_len);
+        CollapseShortEdges(mesh, short_edge_len, long_edge_len);
         mesh.garbage_collection();
 
         EqualizeValences(mesh);
         mesh.garbage_collection();
 
-        TangentialRelaxation(mesh, prop);
+        TangentialRelaxation(mesh);
         mesh.garbage_collection();
     }
 }
 
-
-int main(int argc, char *argv[])
+bool ReadMesh(const std::string& path, Mesh& mesh, CMesh& cmesh)
 {
-    auto path = argc > 1 ? argv[1] : "data/quad.obj";
-
-    Mesh mesh;
     OpenMesh::IO::Options opt = OpenMesh::IO::Options::VertexNormal;
     if (!OpenMesh::IO::read_mesh(mesh, path, opt)) {
         std::cerr << "failed to load mesh from " << path << std::endl;
-        return 1;
+        return false;
     } else {
         std::cout << fmt::format("succeed to load mesh from [{0}]", path) << std::endl;
         PrintMeshInfo(mesh);
@@ -290,6 +390,26 @@ int main(int argc, char *argv[])
     mesh.request_face_normals();
     mesh.update_normals();
 
+    if (!pmp::IO::read_polygon_mesh(path, cmesh)) {
+        spdlog::error("failed to read mesh from path {}", path);
+        return false;
+    } else {
+        spdlog::info("succeed to read cgal mesh from path {}", path);
+    }
+
+    return true;
+}
+
+
+int main(int argc, char *argv[])
+{
+    auto path = argc > 1 ? argv[1] : "data/quad.obj";
+
+    Mesh mesh;
+    CMesh cmesh;
+    ReadMesh(path, mesh, cmesh);
+
+
     auto prop_points = OpenMesh::VProp<OpenMesh::Vec3f>(mesh, "points");
 
     igl::opengl::glfw::Viewer viewer;
@@ -302,10 +422,17 @@ int main(int argc, char *argv[])
     viewer.plugins.push_back(&plugin);
     plugin.widgets.push_back(&menu);
 
+    bool project = true;
     float target_edge_length = 0.5f;
     int iterative_cnt = 10;
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
+
+        if (ImGui::Button("load mesh")) {
+            auto path = igl::file_dialog_open();
+            ReadMesh(path, mesh, cmesh);
+            prop_points = OpenMesh::VProp<OpenMesh::Vec3f>(mesh, "points");
+        }
 
         ImGui::InputFloat("target edge length", &target_edge_length);
         auto short_edge_length = 4.0f / 5.0f * target_edge_length;
@@ -314,36 +441,100 @@ int main(int argc, char *argv[])
         ImGui::LabelText("short edge length", "%f", short_edge_length);
         ImGui::LabelText("long edge length", "%f", long_edge_length);
 
-        if (ImGui::Button("Split Long Edges")) {
-            SplitOneLongEdge(mesh, long_edge_length);
-            mesh.garbage_collection();
-            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
-        }
+        if (ImGui::CollapsingHeader("Remesh Testing")) {
+            ImGui::InputInt("iteration count: ", &iterative_cnt);
+            auto proxy = mesh;
+            if (ImGui::Button("Remesh")) {
+                IncrementalRemesh(proxy, prop_points, target_edge_length, iterative_cnt);
+                meshlib::MeshUtils::ConvertMeshToViewer(proxy, viewer);
+            }
 
-        if (ImGui::Button("Collapse Short Edges")) {
-            CollapseShortEdge(mesh, short_edge_length, long_edge_length);
-            mesh.garbage_collection();
-            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
-        }
+            if (ImGui::Button("remesher")) {
+                meshlib::Remesher remesher;
+                remesher.IsotropicRemeshing(proxy, target_edge_length, iterative_cnt);
+                meshlib::MeshUtils::ConvertMeshToViewer(proxy, viewer);
+            }
 
-        if (ImGui::Button("Equalize Valences")) {
-            EqualizeValences(mesh);
-            mesh.garbage_collection();
-            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
-        }
+            if (ImGui::Button("Split One Long Edges")) {
+                SplitOneLongEdge(mesh, long_edge_length);
+                mesh.garbage_collection();
+                meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            }
 
-        if (ImGui::Button("Tangential Relaxation")) {
-            TangentialRelaxation(mesh, prop_points);
-            mesh.garbage_collection();
-            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            if (ImGui::Button("Split Long Edges")) {
+                SplitLongEdges(mesh, long_edge_length);
+                mesh.garbage_collection();
+                meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            }
+
+            if (ImGui::Button("Collapse Short Edges")) {
+                auto& cloneMesh = mesh;
+                CollapseShortEdge(cloneMesh, short_edge_length, long_edge_length);
+                cloneMesh.garbage_collection();
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("openmesh collapse")) {
+                auto& cloneMesh = mesh;
+                CollapseShortEdges(cloneMesh, short_edge_length, long_edge_length);
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("Equalize Valences")) {
+                EqualizeValences(mesh);
+                mesh.garbage_collection();
+                meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            }
+
+            if (ImGui::Button("Tangential Relaxation")) {
+                TangentialRelaxation(mesh);
+                mesh.garbage_collection();
+                meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            }
         }
 
         ImGui::Spacing();
+        ImGui::Spacing();
 
-        ImGui::InputInt("iteration count: ", &iterative_cnt);
-        if (ImGui::Button("Remesh")) {
-            IncrementalRemesh(mesh, prop_points, target_edge_length, iterative_cnt);
-            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        if (ImGui::CollapsingHeader("CGAL Algorithms")) {
+            ImGui::Checkbox("enable project", &project);
+
+            if (ImGui::Button("cgal split long")) {
+                auto &cloneMesh = cmesh;
+                pmp::split_long_edges(cloneMesh.edges(), long_edge_length, cloneMesh);
+                cloneMesh.collect_garbage();
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("cgal collapse")) {
+                auto& cloneMesh = cmesh;
+                pmp::isotropic_remeshing(CGAL::faces(cloneMesh), static_cast<double>(target_edge_length), cloneMesh,
+                                         pmp::parameters::number_of_iterations(1)
+                                                 .do_flip(false)
+                                                 .do_flip(false)
+                                                 .number_of_relaxation_steps(0)
+                                                 .do_project(false)
+                                                 .protect_constraints(true));
+                cloneMesh.collect_garbage();
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("cgal tangential relaxation")) {
+                auto &cloneMesh = cmesh;
+                pmp::tangential_relaxation(cloneMesh);
+                cloneMesh.collect_garbage();
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("cgal remesh")) {
+                auto cloneMesh = cmesh;
+                pmp::isotropic_remeshing(CGAL::faces(cloneMesh), static_cast<double>(target_edge_length), cloneMesh,
+                                         pmp::parameters::number_of_iterations(10)
+                                                 .protect_constraints(true)
+                                                 .do_project(project));
+                cloneMesh.collect_garbage();
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
         }
 
         if (ImGui::Button("write mesh")) {
@@ -352,6 +543,7 @@ int main(int argc, char *argv[])
     };
 
     meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+    meshlib::MeshUtils::ConvertMeshToViewer(cmesh, viewer);
 
     //SplitLongEdges(mesh, 0.6f);
 
