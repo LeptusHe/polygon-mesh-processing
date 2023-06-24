@@ -5,8 +5,9 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
-#include "kmeans.h"
-#include "ColorSetGenerator.h"
+
+#include "segmentation/kmeans.h"
+#include "visualization/color_set_generator.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 

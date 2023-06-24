@@ -33,7 +33,9 @@ set(padding_zero_count 2)
 function(define_app_target target app_dir)
     generate_app_name(app_name ${target} ${app_count} ${padding_zero_count})
 
-    add_executable(${app_name} ${app_dir}/main.cc)
+    file(GLOB sources "${app_dir}/*.cc" "${app_dir}/*.cpp")
+    message(STATUS "Build Info: app_name: ${app_name}, app_dir: ${app_dir} sources: ${sources}")
+    add_executable(${app_name} ${sources})
     set_target_properties(${app_name} PROPERTIES OUTPUT_NAME "${app_name}")
     target_include_directories(${app_name} PRIVATE src)
     target_link_libraries(${app_name} PRIVATE meshlib)
@@ -52,7 +54,7 @@ define_app_target(openmesh openmesh)
 define_app_target(geometry-property-visualization geom-prop-vis)
 
 # parameterization
-define_app_target(multi-dimension-scaling multi-dimension-scaling)
+define_app_target(parameterization-mds multi-dimension-scaling)
 define_app_target(parameterization-tutte param-tutte)
 define_app_target(parameterization-lscm lscm)
 
@@ -70,4 +72,4 @@ define_app_target(remesh remesh)
 
 message(STATUS "app targets: ${app_targets}")
 
-add_custom_target(build_all DEPENDS ${app_targets})
+add_custom_target(build-all DEPENDS ${app_targets})

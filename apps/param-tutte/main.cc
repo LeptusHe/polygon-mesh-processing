@@ -4,13 +4,14 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <fmt/format.h>
 #include <unordered_set>
-#include <Eigen/Eigen>
 #include <Eigen/SparseQR>
 #include <exception>
 #include <filesystem>
 #include <igl/harmonic.h>
-#include "MeshIO.h"
+#include <igl/adjacency_list.h>
 #include <OpenMesh/Core/Utils/PropertyManager.hh>
+
+#include "utils/mesh_io.h"
 
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;

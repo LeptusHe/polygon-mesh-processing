@@ -7,7 +7,6 @@
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-#include "MeshUtils.h"
 #include <queue>
 #include <utility>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
@@ -15,6 +14,9 @@
 #include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
 #include <OpenMesh/Tools/Decimater/ModNormalFlippingT.hh>
 #include <OpenMesh/Tools/Decimater/MixedDecimaterT.hh>
+#include <imgui.h>
+
+#include "utils/mesh_utils.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 using Item = std::pair<double, Mesh::EdgeHandle>;
@@ -58,7 +60,7 @@ Mesh::VertexHandle CollapseEdge(Mesh& mesh, PriorityQueue& queue)
 
     while (true) {
         if (queue.empty()) {
-            return Mesh::InvalidVertexHandle;
+            return Mesh::VertexHandle();
         }
 
         edgeHandle = queue.top().second;
@@ -214,7 +216,7 @@ int main(int argc, char *argv[])
             for (int i = 0; i < faceCount; ++ i) {
                 vh = CollapseEdge(mesh, queue);
             }
-            if (vh != Mesh::InvalidVertexHandle) {
+            if (vh.is_valid()) {
                 meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
 
                 auto item = queue.top();

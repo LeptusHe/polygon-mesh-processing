@@ -9,6 +9,7 @@ add_library(meshlib STATIC
     utils/mesh_io.cc
     utils/mesh_utils.cc
     remesh/remesher.cpp
+    segmentation/kmeans.cc
     visualization/color_set_generator.cc)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")

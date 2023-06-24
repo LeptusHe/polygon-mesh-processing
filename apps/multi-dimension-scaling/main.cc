@@ -7,12 +7,17 @@
 #include <igl/exact_geodesic.h>
 #include <fmt/format.h>
 #include "property/face-normal.h"
+
+#if ENABLE_POLYSCOPE_VISULIZER
 #include <polyscope/polyscope.h>
 #include <polyscope/surface_mesh.h>
+#endif
+
 #include <fmt/ostream.h>
-#include <spdlog/fmt/ostr.h>
+#include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include "mds.h"
+
+#include "parameterization/mds.h"
 
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
@@ -67,7 +72,7 @@ int main(int argc, char *argv[])
         std::cout << "face count: " << F.rows() << std::endl;
     }
 
-    auto logger = spdlog::basic_logger_mt("basic_logger", "logs/basic1.txt");
+    auto logger = spdlog::basic_logger_mt("basic_logger", "logs/basic.txt");
     auto clogger = spdlog::basic_logger_mt("basic_logger2", "logs/basic2.txt");
 
     // Compute per-face normals

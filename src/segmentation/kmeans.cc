@@ -1,4 +1,5 @@
 #include "kmeans.h"
+#include <iostream>
 
 void KMeans::Run(int k, int maxIter)
 {

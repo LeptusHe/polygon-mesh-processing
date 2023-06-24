@@ -1,5 +1,6 @@
 #include "iterative-cluster.h"
 #include <queue>
+#include <iostream>
 
 struct Item {
 public:

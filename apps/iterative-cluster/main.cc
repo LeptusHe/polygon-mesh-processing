@@ -9,8 +9,9 @@
 #include <imgui.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
+
 #include "IterativeCluster.h"
-#include "ColorSetGenerator.h"
+#include "visualization/color_set_generator.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
