@@ -3,5 +3,6 @@
 	url = https://github.com/libigl/libigl.git
 	branch = stable
 [submodule "externals/polyscope"]
+	branch = pmp
 	path = externals/polyscope
 	url = https://github.com/LeptusHe/polyscope.git
