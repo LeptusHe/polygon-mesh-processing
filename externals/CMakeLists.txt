@@ -15,4 +15,10 @@ set(LIBIGL_XML OFF CACHE BOOL "disable xml")
 add_subdirectory(libigl)
 
 
-set(third_party_include_dirs ${CMAKE_CURRENT_SOURCE_DIR}/libigl/include PARENT_SCOPE)
+
+add_subdirectory(polyscope)
+
+set(third_party_include_dirs
+    ${CMAKE_CURRENT_SOURCE_DIR}/libigl/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/polyscope/include
+    PARENT_SCOPE)

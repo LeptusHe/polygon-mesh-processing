@@ -22,6 +22,7 @@ target_include_directories(meshlib PUBLIC
 
 target_link_libraries(meshlib PUBLIC
     ${OPENMESH_LIBRARIES}
+    polyscope
     CGAL::CGAL
     igl::core
     igl::opengl
