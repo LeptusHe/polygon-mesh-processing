@@ -8,7 +8,9 @@
 #include <fmt/format.h>
 #include "property/face-normal.h"
 
-#if ENABLE_POLYSCOPE_VISULIZER
+#define ENABLE_POLYSCOPE_VISUALIZER 1
+
+#if ENABLE_POLYSCOPE_VISUALIZER
 #include <polyscope/polyscope.h>
 #include <polyscope/surface_mesh.h>
 #endif
@@ -183,14 +185,13 @@ int main(int argc, char *argv[])
         C.row(i) = Eigen::Vector3d{uv(i, 0), uv(i, 1), 0};
     }
 
-    /*
+#if ENABLE_POLYSCOPE_VISUALIZER
     polyscope::init();
     polyscope::registerSurfaceMesh("mesh", V, F);
     polyscope::show();
 
     polyscope::getSurfaceMesh("mesh")->addVertexColorQuantity("vColor", C);
-     */
-
+#else
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(C, F);
     viewer.data().set_colors(C);
@@ -198,6 +199,7 @@ int main(int argc, char *argv[])
     viewer.data().set_normals(N_faces);
 
     viewer.launch();
+#endif
 
     return 0;
 }
