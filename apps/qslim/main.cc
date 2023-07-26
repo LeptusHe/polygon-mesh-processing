@@ -55,7 +55,7 @@ bool ValidToCollapse(const Mesh& mesh, Mesh::EdgeHandle eh)
 
 Mesh::VertexHandle CollapseEdge(Mesh& mesh, PriorityQueue& queue)
 {
-    auto edgeHandle = Mesh::InvalidEdgeHandle;
+    Mesh::EdgeHandle edgeHandle;
     Mesh::HalfedgeHandle halfEdgeHandle;
 
     while (true) {

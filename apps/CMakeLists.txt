@@ -30,21 +30,51 @@ set(app_targets "")
 set(app_count 1)
 set(padding_zero_count 2)
 
-function(define_app_target target app_dir)
+function(define_app_target_internal target app_dir enable_polyscope output_app_name)
     generate_app_name(app_name ${target} ${app_count} ${padding_zero_count})
+
+    message(STATUS "set polyscope option: ${enable_polyscope} to target ${app_name}")
 
     file(GLOB sources "${app_dir}/*.cc" "${app_dir}/*.cpp")
     message(STATUS "Build Info: app_name: ${app_name}, app_dir: ${app_dir} sources: ${sources}")
     add_executable(${app_name} ${sources})
     set_target_properties(${app_name} PROPERTIES OUTPUT_NAME "${app_name}")
     target_include_directories(${app_name} PRIVATE src)
-    target_link_libraries(${app_name} PRIVATE meshlib)
+
+    if (enable_polyscope)
+        target_link_libraries(${app_name} PRIVATE
+            meshlib
+            polyscope
+        )
+    else ()
+        target_link_libraries(${app_name} PRIVATE
+            meshlib
+            igl::opengl
+            igl::glfw
+            igl::imgui
+        )
+    endif ()
+
     target_compile_definitions(${app_name} PRIVATE "$<$<CONFIG:Debug>:ENABLE_DEBUG_LOG>")
     message(STATUS "Add Application Target: ${app_name}")
 
-    set(app_targets ${app_targets} ${app_name} PARENT_SCOPE)
+    set(${output_app_name} ${app_name} PARENT_SCOPE)
+endfunction()
+
+function(define_app_target target app_dir)
+    define_app_target_internal(${target} ${app_dir} "False" out_app_name)
+
     math(EXPR incremented_app_id "${app_count} + 1")
     set(app_count ${incremented_app_id} PARENT_SCOPE)
+    set(app_targets ${app_targets} ${out_app_name} PARENT_SCOPE)
+endfunction()
+
+function(define_app_target_with_polyscope target app_dir)
+    define_app_target_internal(${target} ${app_dir} "True" out_app_name)
+
+    math(EXPR incremented_app_id "${app_count} + 1")
+    set(app_count ${incremented_app_id} PARENT_SCOPE)
+    set(app_targets ${app_targets} ${out_app_name} PARENT_SCOPE)
 endfunction()
 
 # basic usage

@@ -22,12 +22,8 @@ target_include_directories(meshlib PUBLIC
 
 target_link_libraries(meshlib PUBLIC
     ${OPENMESH_LIBRARIES}
-    polyscope
     CGAL::CGAL
     igl::core
-    igl::opengl
-    igl::glfw
-    igl::imgui
     fmt::fmt
     Eigen3::Eigen
     spdlog::spdlog)
