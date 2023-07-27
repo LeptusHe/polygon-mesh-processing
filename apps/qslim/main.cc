@@ -145,7 +145,7 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     std::cout << fmt::format("half edge count: {}\n\n", mesh.n_halfedges());
 }
 
-bool Collinear(Mesh& mesh, Mesh::HalfedgeHandle cur, Mesh::HalfedgeHandle next)
+bool Collinear(Mesh& mesh, Mesh::HalfedgeHandle cur, Mesh::HalfedgeHandle next, float& cos_theta)
 {
     auto v0 = mesh.from_vertex_handle(cur);
     auto v1 = mesh.to_vertex_handle(cur);
@@ -158,8 +158,118 @@ bool Collinear(Mesh& mesh, Mesh::HalfedgeHandle cur, Mesh::HalfedgeHandle next)
     auto l1 = (p0 - p1).normalized();
     auto l2 = (p2 - p1).normalized();
 
-    auto cos_theta = l1.dot(l2);
+    cos_theta = l1.dot(l2);
     return std::abs(cos_theta + 1) < 1e-3;
+}
+
+void ColorBoundaryVertex(Mesh& mesh)
+{
+    for (auto vh : mesh.vertices()) {
+        if (vh.is_boundary()) {
+            mesh.set_color(vh, {1, 0, 0});
+        } else {
+            mesh.set_color(vh, {1, 1, 1});
+        }
+    }
+}
+
+void FindBoundaryEdge(Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
+{
+    Mesh::HalfedgeHandle cur, next;
+    bool found = false;
+
+    for (auto hf : mesh.halfedges()) {
+        cur = hf;
+
+        if (!mesh.is_boundary(cur))
+            continue;
+
+        next = mesh.next_halfedge_handle(cur);
+        if (!next.is_valid() || !mesh.is_boundary(next))
+            continue;
+
+        found = true;
+        break;
+    }
+
+    float cos_theta = 0;
+    Collinear(mesh, cur, next, cos_theta);
+    std::cout << "cos theta: " << cos_theta << std::endl;
+
+    if (found) {
+        auto v0 = mesh.from_vertex_handle(cur);
+        auto v1 = mesh.to_vertex_handle(cur);
+        auto v2 = mesh.to_vertex_handle(next);
+
+        auto p0 = mesh.point(v0);
+        auto p1 = mesh.point(v1);
+        auto p2 = mesh.point(v2);
+
+        Eigen::Matrix3d p;
+        p.row(0) = Eigen::Vector3d(p0[0], p0[1], p0[2]);
+        p.row(1) = Eigen::Vector3d(p1[0], p1[1], p1[2]);
+        p.row(2) = Eigen::Vector3d(p2[0], p2[1], p2[2]);
+
+        auto strs = std::vector<std::string> {
+            "v0",
+            "v1",
+            "v2"
+        };
+        viewer.data().show_custom_labels = true;
+        viewer.data().label_size = 4;
+        viewer.data().set_labels(p, strs);
+    }
+}
+
+void FindCollinearBoundaryEdge(Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
+{
+    Mesh::HalfedgeHandle cur, next;
+    bool found = false;
+
+    for (auto hf : mesh.halfedges()) {
+        cur = hf;
+
+        if (!mesh.is_boundary(cur))
+            continue;
+
+        next = mesh.next_halfedge_handle(cur);
+        if (!next.is_valid() || !mesh.is_boundary(next))
+            continue;
+
+        float cos_theta = 0;
+        if (!Collinear(mesh, cur, next, cos_theta))
+            continue;
+
+        if (!mesh.is_collapse_ok(next))
+            continue;
+
+        found = true;
+        break;
+    }
+
+    if (found) {
+        auto v0 = mesh.from_vertex_handle(cur);
+        auto v1 = mesh.to_vertex_handle(cur);
+        auto v2 = mesh.to_vertex_handle(next);
+
+        auto p0 = mesh.point(v0);
+        auto p1 = mesh.point(v1);
+        auto p2 = mesh.point(v2);
+
+        Eigen::Matrix3d p;
+        p.row(0) = Eigen::Vector3d(p0[0], p0[1], p0[2]);
+        p.row(1) = Eigen::Vector3d(p1[0], p1[1], p1[2]);
+        p.row(2) = Eigen::Vector3d(p2[0], p2[1], p2[2]);
+
+        auto strs = std::vector<std::string> {
+            "v0",
+            "v1",
+            "v2"
+        };
+        viewer.data().show_custom_labels = true;
+        viewer.data().label_size = 2;
+        viewer.data().set_labels(p, strs);
+    }
 }
 
 void CollapseBoundaryEdge(Mesh& mesh)
@@ -177,7 +287,11 @@ void CollapseBoundaryEdge(Mesh& mesh)
         if (!next.is_valid() || !mesh.is_boundary(next))
             continue;
 
-        if (!Collinear(mesh, cur, next))
+        float cos_theta = 0;
+        if (!Collinear(mesh, cur, next, cos_theta))
+            continue;
+
+        if (!mesh.is_collapse_ok(next))
             continue;
 
         found = true;
@@ -185,17 +299,25 @@ void CollapseBoundaryEdge(Mesh& mesh)
     }
 
     if (found) {
-        auto v1 = mesh.to_vertex_handle(cur);
-        auto v2 = mesh.to_vertex_handle(next);
+        //auto v1 = mesh.to_vertex_handle(cur);
+        //auto v2 = mesh.to_vertex_handle(next);
 
-        auto p2 = mesh.point(v2);
-        mesh.set_point(v1, p2);
+        //auto p2 = mesh.point(v2);
+        //mesh.set_point(v1, p2);
 
         auto next_op = mesh.opposite_halfedge_handle(next);
         auto fh = mesh.face_handle(next_op);
-        mesh.delete_face(fh);
+        //mesh.delete_face(fh);
+
+        if (mesh.is_collapse_ok(next)) {
+            mesh.collapse(next);
+        } else {
+            std::cout << "failed to collapse half edge" << std::endl;
+        }
 
         mesh.garbage_collection();
+    } else {
+        std::cout << "failed to find" << std::endl;
     }
 }
 
@@ -260,6 +382,20 @@ int main(int argc, char *argv[])
                 mesh.collapse(halfedge);
                 meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
             }
+        }
+
+        if (ImGui::Button("Color Boundary Vertex")) {
+            mesh.request_vertex_colors();
+            ColorBoundaryVertex(mesh);
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        }
+
+        if (ImGui::Button("Find Boundary Edge")) {
+            FindBoundaryEdge(mesh, viewer);
+        }
+
+        if (ImGui::Button("Find Collinear Boundary Edge")) {
+            FindCollinearBoundaryEdge(mesh, viewer);
         }
 
         if (ImGui::Button("Collapse Boundary")) {

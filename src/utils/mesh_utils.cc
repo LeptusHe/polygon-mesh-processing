@@ -7,11 +7,17 @@ namespace meshlib {
 void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
 {
     Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
     Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
 
     for (auto vh : mesh.vertices()) {
         auto vert = mesh.point(vh);
         V.row(vh.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+
+        if (mesh.has_vertex_colors()) {
+            auto color = mesh.color(vh);
+            C.row(vh.idx()) = Eigen::Vector3d(color[0], color[1], color[2]);
+        }
     }
 
     for (auto fh : mesh.faces()) {
@@ -24,6 +30,10 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
+
+    if (mesh.has_vertex_colors()) {
+        viewer.data().set_colors(C);
+    }
 }
 
 void MeshUtils::ConvertMeshToViewer(const CMesh& mesh, igl::opengl::glfw::Viewer& viewer)
