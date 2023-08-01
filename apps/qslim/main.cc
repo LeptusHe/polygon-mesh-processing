@@ -17,6 +17,7 @@
 #include <imgui.h>
 #include <cmath>
 
+#include "utils/vertex_merger.h"
 #include "utils/mesh_utils.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -382,6 +383,13 @@ int main(int argc, char *argv[])
                 mesh.collapse(halfedge);
                 meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
             }
+        }
+
+        if (ImGui::Button("Merge Vertex")) {
+            vertex_merger vertexMerger;
+            std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
+            mesh = vertexMerger.Merge(mesh);
+            std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
         }
 
         if (ImGui::Button("Color Boundary Vertex")) {

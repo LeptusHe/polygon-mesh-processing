@@ -3,18 +3,17 @@
 
 class vertex_merger {
 private:
-    static constexpr float maxDigits = 1000000.0f;
 
 public:
-    void Merge(Mesh& mesh);
-    void MergeVertex(Mesh::VertexHandle oldVertex, Mesh::VertexHandle newVertex);
+    Mesh Merge(Mesh& mesh);
 
 private:
     void CollectMeshData(const Mesh& mesh);
-    [[nodiscard]] std::size_t hash(const Mesh::Point& p) const;
-    [[nodiscard]] bool equal(const Mesh::Point& lhs, const Mesh::Point& rhs) const;
+    void MergeVertex();
+    Mesh RebuildMesh();
 
 private:
-    std::vector<Mesh::Point> vertices;
-    std::vector<int> indices;
+    std::vector<Mesh::Point> m_vertices;
+    std::vector<Mesh::Point> m_newVertices;
+    std::vector<int> m_indices;
 };
