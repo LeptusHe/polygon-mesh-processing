@@ -102,6 +102,9 @@ void vertex_merger::MergeVertex()
 Mesh vertex_merger::RebuildMesh()
 {
     Mesh mesh;
+    mesh.request_vertex_status();
+    mesh.request_edge_status();
+    mesh.request_face_status();
     mesh.request_face_normals();
 
     for (int i = 0; i < m_newVertices.size(); i++) {
