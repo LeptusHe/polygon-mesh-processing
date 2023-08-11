@@ -11,8 +11,12 @@ add_library(meshlib STATIC
     remesh/remesher.cpp
     segmentation/kmeans.cc
     visualization/color_set_generator.cc
-        utils/vertex_merger.cc
-        utils/vertex_merger.h)
+    utils/vertex_merger.cc
+    utils/vertex_merger.h
+    simplification/simplification.cc
+    simplification/simplification.h
+    visualization/mesh_vis.cc
+    visualization/mesh_vis.h)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")
 target_compile_definitions(meshlib PUBLIC _USE_MATH_DEFINES)

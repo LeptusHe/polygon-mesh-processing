@@ -9,13 +9,18 @@
 #include <imgui.h>
 #include "utils/mesh_utils.h"
 #include "remesh/remesher.h"
+#include "utils/vertex_merger.h"
+#include "simplification/simplification.h"
 #include <spdlog/spdlog.h>
 
 #include <boost/bimap.hpp>
 #include <boost/bimap/set_of.hpp>
 #include <boost/bimap/multiset_of.hpp>
 
+#include <CGAL/IO/polygon_soup_io.h>
 #include <CGAL/polygon_mesh_processing/remesh.h>
+#include <CGAL/polygon_mesh_processing/merge_border_vertices.h>
+#include <CGAL/polygon_mesh_processing/remesh_planar_patches.h>
 #include <igl/file_dialog_open.h>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -400,6 +405,11 @@ bool ReadMesh(const std::string& path, Mesh& mesh, CMesh& cmesh)
     return true;
 }
 
+void WriteMesh(CMesh& mesh, const std::string& filepath)
+{
+    CGAL::IO::write_polygon_mesh(filepath, mesh, CGAL::parameters::stream_precision(17));
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -423,6 +433,7 @@ int main(int argc, char *argv[])
     plugin.widgets.push_back(&menu);
 
     bool project = true;
+    bool keep_boundary = true;
     float target_edge_length = 0.5f;
     int iterative_cnt = 10;
     menu.callback_draw_viewer_menu = [&]() {
@@ -434,12 +445,23 @@ int main(int argc, char *argv[])
             prop_points = OpenMesh::VProp<OpenMesh::Vec3f>(mesh, "points");
         }
 
+        if (ImGui::Button("merge vertex")) {
+            vertex_merger vertexMerger;
+            std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
+            mesh = vertexMerger.Merge(mesh);
+            std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
+        }
+
         ImGui::InputFloat("target edge length", &target_edge_length);
         auto short_edge_length = 4.0f / 5.0f * target_edge_length;
         auto long_edge_length = 4.0f / 3.0f * target_edge_length;
 
         ImGui::LabelText("short edge length", "%f", short_edge_length);
         ImGui::LabelText("long edge length", "%f", long_edge_length);
+
+        if (ImGui::Button("Component")) {
+
+        }
 
         if (ImGui::CollapsingHeader("Remesh Testing")) {
             ImGui::InputInt("iteration count: ", &iterative_cnt);
@@ -498,6 +520,7 @@ int main(int argc, char *argv[])
 
         if (ImGui::CollapsingHeader("CGAL Algorithms")) {
             ImGui::Checkbox("enable project", &project);
+            ImGui::Checkbox("keep boundary", &keep_boundary);
 
             if (ImGui::Button("cgal split long")) {
                 auto &cloneMesh = cmesh;
@@ -528,12 +551,51 @@ int main(int argc, char *argv[])
 
             if (ImGui::Button("cgal remesh")) {
                 auto cloneMesh = cmesh;
+                pmp::merge_duplicated_vertices_in_boundary_cycles(cloneMesh);
                 pmp::isotropic_remeshing(CGAL::faces(cloneMesh), static_cast<double>(target_edge_length), cloneMesh,
                                          pmp::parameters::number_of_iterations(10)
-                                                 .protect_constraints(true)
+                                                 .protect_constraints(keep_boundary)
                                                  .do_project(project));
                 cloneMesh.collect_garbage();
                 meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
+            if (ImGui::Button("cagl plannar patch remesh")) {
+                //pmp::remesh
+                auto cloneMesh = cmesh;
+                pmp::duplicate_non_manifold_vertices(cloneMesh);
+
+                CMesh outMesh;
+                pmp::remesh_planar_patches(cloneMesh, outMesh);
+                                           //pmp::parameters::cosine_of_maximum_angle(0.99));
+                //pmp::remesh_almost_planar_patches(cloneMesh, outMesh);
+                outMesh.collect_garbage();
+                //pmp::remove_almost_degenerate_faces(outMesh);
+
+                meshlib::MeshUtils::ConvertMeshToViewer(outMesh, viewer);
+
+                spdlog::info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
+                spdlog::info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());
+
+
+                for (auto vertex : outMesh.vertices()) {
+                    auto point = outMesh.point(vertex);
+                    spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
+                }
+
+                WriteMesh(outMesh, "data/remesh-result.obj");
+            }
+
+            if (ImGui::Button("Continue To Collapse Boundary")) {
+                int count = 0;
+                bool found = true;
+                do {
+                    found = meshlib::CollapseBoundaryEdge(mesh);
+                    count += 1;
+                } while (found);
+
+                std::cout << "found: " << count << std::endl;
+                meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
             }
         }
 

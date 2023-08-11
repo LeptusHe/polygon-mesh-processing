@@ -19,6 +19,7 @@
 
 #include "utils/vertex_merger.h"
 #include "utils/mesh_utils.h"
+#include "visualization/mesh_vis.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 using Item = std::pair<double, Mesh::EdgeHandle>;
@@ -163,17 +164,6 @@ bool Collinear(Mesh& mesh, Mesh::HalfedgeHandle cur, Mesh::HalfedgeHandle next, 
     return std::abs(cos_theta + 1) < 1e-3;
 }
 
-void ColorBoundaryVertex(Mesh& mesh)
-{
-    for (auto vh : mesh.vertices()) {
-        if (vh.is_boundary()) {
-            mesh.set_color(vh, {1, 0, 0});
-        } else {
-            mesh.set_color(vh, {1, 1, 1});
-        }
-    }
-}
-
 void FindBoundaryEdge(Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
 {
     Mesh::HalfedgeHandle cur, next;
@@ -273,7 +263,7 @@ void FindCollinearBoundaryEdge(Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
     }
 }
 
-void CollapseBoundaryEdge(Mesh& mesh)
+bool CollapseBoundaryEdge(Mesh& mesh)
 {
     Mesh::HalfedgeHandle cur, next;
     bool found = false;
@@ -320,6 +310,7 @@ void CollapseBoundaryEdge(Mesh& mesh)
     } else {
         std::cout << "failed to find" << std::endl;
     }
+    return found;
 }
 
 int main(int argc, char *argv[])
@@ -394,7 +385,7 @@ int main(int argc, char *argv[])
 
         if (ImGui::Button("Color Boundary Vertex")) {
             mesh.request_vertex_colors();
-            ColorBoundaryVertex(mesh);
+            meshlib::ColorBoundaryVertex(mesh);
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
         }
 
@@ -408,6 +399,18 @@ int main(int argc, char *argv[])
 
         if (ImGui::Button("Collapse Boundary")) {
             CollapseBoundaryEdge(mesh);
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        }
+
+        if (ImGui::Button("Continue To Collapse Boundary")) {
+            int count = 0;
+            bool found = true;
+            do {
+                found = CollapseBoundaryEdge(mesh);
+                count += 1;
+            } while (found);
+
+            std::cout << "found: " << count << std::endl;
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
         }
 
