@@ -10,8 +10,10 @@
 #include "utils/mesh_utils.h"
 #include "remesh/remesher.h"
 #include "utils/vertex_merger.h"
+#include "utils/mesh_io.h"
 #include "simplification/simplification.h"
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include <boost/bimap.hpp>
 #include <boost/bimap/set_of.hpp>
@@ -419,6 +421,7 @@ int main(int argc, char *argv[])
     CMesh cmesh;
     ReadMesh(path, mesh, cmesh);
 
+    cmesh = meshlib::ConvertOpenMeshToSurfaceMesh(mesh);
 
     auto prop_points = OpenMesh::VProp<OpenMesh::Vec3f>(mesh, "points");
 
@@ -572,16 +575,22 @@ int main(int argc, char *argv[])
                 outMesh.collect_garbage();
                 //pmp::remove_almost_degenerate_faces(outMesh);
 
+                cmesh = outMesh;
                 meshlib::MeshUtils::ConvertMeshToViewer(outMesh, viewer);
 
-                spdlog::info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
-                spdlog::info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());
+                auto logger = spdlog::basic_logger_mt("file-logger", "logs/remesh-result.txt");
 
+                logger->info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
+                logger->info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());
 
-                for (auto vertex : outMesh.vertices()) {
-                    auto point = outMesh.point(vertex);
-                    spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
+                auto sorted_points = meshlib::MeshUtils::GetSortedPoints(outMesh);
+                for (auto point : sorted_points) {
+                    logger->info("v: {}, {}, {}", point[0], point[1], point[2]);
                 }
+                for (auto vertex : outMesh.vertices()) {
+                    //auto point = outMesh.point(vertex);
+                }
+                logger->flush();
 
                 WriteMesh(outMesh, "data/remesh-result.obj");
             }

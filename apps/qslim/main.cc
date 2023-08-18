@@ -327,6 +327,13 @@ int main(int argc, char *argv[])
         PrintMeshInfo(mesh);
     }
 
+    vertex_merger vertex_merger;
+    auto merged_mesh = vertex_merger.Merge(mesh);
+    merged_mesh.garbage_collection();
+    PrintMeshInfo(merged_mesh);
+    OpenMesh::IO::write_mesh(merged_mesh, "data/merge-terrain-grid3.obj");
+    return 0;
+
     mesh.request_vertex_status();
     mesh.request_edge_status();
     mesh.request_face_status();
@@ -377,9 +384,9 @@ int main(int argc, char *argv[])
         }
 
         if (ImGui::Button("Merge Vertex")) {
-            vertex_merger vertexMerger;
+            //vertex_merger vertex_merger;
             std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
-            mesh = vertexMerger.Merge(mesh);
+            mesh = vertex_merger.Merge(mesh);
             std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
         }
 
