@@ -11,6 +11,7 @@ private:
     void CollectMeshData(const Mesh& mesh);
     void MergeVertex();
     Mesh RebuildMesh();
+    void OutputSortedVertex(const std::vector<Mesh::Point>& points);
 
 private:
     std::vector<Mesh::Point> m_vertices;

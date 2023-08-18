@@ -1,4 +1,5 @@
 #include "vertex_merger.h"
+#include <spdlog/spdlog.h>
 
 namespace {
 
@@ -127,5 +128,20 @@ Mesh vertex_merger::RebuildMesh()
         //              mesh.vertex_handle(m_indices[i + 2]));
     }
     mesh.update_face_normals();
+
+    OutputSortedVertex(m_newVertices);
+
     return mesh;
+}
+
+void vertex_merger::OutputSortedVertex(const std::vector<Mesh::Point>& data)
+{
+    auto points = data;
+    std::sort(std::begin(points), std::end(points), [=](const Mesh::Point& lhs, const Mesh::Point& rhs) {
+        return std::tie(lhs[0], lhs[1], lhs[2]) < std::tie(rhs[0], rhs[1], rhs[2]);
+    });
+
+    for (const auto p : points) {
+        spdlog::info("v: {}, {}, {}", p[0], p[1], p[2]);
+    }
 }
