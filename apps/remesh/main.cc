@@ -654,6 +654,8 @@ int main(int argc, char *argv[])
                 pmp::orient(clean_mesh);
 
                 int stitch_cnt = pmp::stitch_boundary_cycles(clean_mesh);
+                pmp::remove_almost_degenerate_faces(clean_mesh);
+                clean_mesh.collect_garbage();
                 spdlog::info("stitch count: {}", stitch_cnt);
 
                 auto col_map = clean_mesh.add_property_map<CMesh::Vertex_index, Eigen::Vector3d>("v:colors").first;
@@ -682,6 +684,13 @@ int main(int argc, char *argv[])
                     if (!pmp::Planar_segmentation::is_edge_between_coplanar_faces<Kernel>(e, clean_mesh, cos_theta, point_map)) {
                         col_map[sv] = Eigen::Vector3d(0, 1, 0);
                         col_map[dv] = Eigen::Vector3d(0, 1, 0);
+
+                        auto f1 = clean_mesh.face(half_edge);
+                        auto op_edge = clean_mesh.opposite(half_edge);
+                        auto f2 = clean_mesh.face(op_edge);
+
+                        auto area1 = pmp::face_area(f1, clean_mesh);
+                        auto area2 = pmp::face_area(f2, clean_mesh);
 
                         pmp::Planar_segmentation::is_edge_between_coplanar_faces<Kernel>(e, clean_mesh, cos_theta, point_map);
 
