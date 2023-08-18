@@ -1,4 +1,5 @@
 #include "vertex_merger.h"
+#include <spdlog/spdlog.h>
 
 namespace {
 
@@ -13,7 +14,7 @@ constexpr float maxDigits = 100.0f;
 
 class PointHash {
 public:
-    std::size_t operator()(const Mesh::Point& p) const
+    std::size_t operator()(const CMesh::Point& p) const
     {
         auto x = static_cast<int64_t >(p[0] * maxDigits);
         auto y = static_cast<int64_t>(p[1] * maxDigits);
@@ -33,7 +34,7 @@ public:
 
 class PointCompare {
 public:
-    bool operator()(const Mesh::Point& lhs, const Mesh::Point& rhs) const
+    bool operator()(const CMesh::Point& lhs, const CMesh::Point& rhs) const
     {
         auto lhs_x = static_cast<int64_t>(lhs[0] * maxDigits);
         auto lhs_y = static_cast<int64_t>(lhs[1] * maxDigits);
@@ -50,41 +51,74 @@ public:
 }
 
 
-Mesh vertex_merger::Merge(Mesh& mesh)
+CMesh vertex_merger::Merge(CMesh& mesh)
 {
     CollectMeshData(mesh);
     MergeVertex();
-    return RebuildMesh();
+    //return RebuildMesh();
+    return mesh;
 }
 
-void vertex_merger::CollectMeshData(const Mesh& mesh)
+void vertex_merger::CollectMeshData(const CMesh& mesh)
 {
-    m_vertices.resize(mesh.n_vertices());
+    m_vertices.resize(mesh.num_vertices());
     for (auto vertex : mesh.vertices()) {
         auto idx = vertex.idx();
         auto p = mesh.point(vertex);
         m_vertices[idx] = p;
     }
 
-    m_indices.resize(3 * mesh.n_faces());
+    m_indices.resize(mesh.num_faces());
     for (auto fh : mesh.faces()) {
         auto faceIndex = fh.idx();
 
         int vIdx = 0;
+        std::vector<std::size_t> indices(3);
+        for (const auto vh : mesh.vertices_around_face(mesh.halfedge(fh))) {
+            indices.push_back(vh.idx());
+
+            //m_indices[3 * faceIndex + vIdx] = vh.idx();
+            //vIdx += 1;
+        }
+        m_indices[faceIndex] = indices;
+
+        /*
         for (auto vh : fh.vertices()) {
             m_indices[3 * faceIndex + vIdx] = vh.idx();
             vIdx += 1;
         }
+         */
     }
 }
 
 void vertex_merger::MergeVertex()
 {
     m_newVertices.clear();
-    std::unordered_map<Mesh::Point, int, PointHash, PointCompare> map;
+    std::unordered_map<CMesh::Point, int, PointHash, PointCompare> map;
 
     for (int i = 0; i < m_indices.size(); ++ i) {
-        auto index = m_indices[i];
+        auto& polygon = m_indices[i];
+
+        for (int k = 0; k < polygon.size(); ++ k) {
+            auto index = polygon[k];
+
+            auto point = m_vertices[index];
+
+            if (map.find(point) == std::end(map)) {
+                int newIndex = static_cast<int>(m_newVertices.size());
+
+                m_newVertices.push_back(point);
+                polygon[i] = newIndex;
+
+                map[point] = newIndex;
+            } else {
+                int newIndex = map[point];
+                polygon[i] = newIndex;
+            }
+        }
+
+        //auto index = m_indices[i];
+        /*
         auto vertex = m_vertices[index];
 
         if (map.find(vertex) == std::end(map)) {
@@ -97,9 +131,11 @@ void vertex_merger::MergeVertex()
             int newIndex = map[vertex];
             m_indices[i] = newIndex;
         }
+         */
     }
 }
 
+/*
 Mesh vertex_merger::RebuildMesh()
 {
     Mesh mesh;
@@ -128,4 +164,74 @@ Mesh vertex_merger::RebuildMesh()
     }
     mesh.update_face_normals();
     return mesh;
+}
+ */
+
+float Clamp(float a)
+{
+    constexpr float digit = 100.0f;
+
+    float x = std::floor(a * digit);
+    return x / digit;
+}
+
+
+int RemoveDuplicationVertex(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons)
+{
+    std::vector<CMesh::Point> m_newVertices;
+    std::unordered_map<CMesh::Point, int, PointHash, PointCompare> map;
+
+    for (int i = 0; i < polygons.size(); ++ i) {
+        auto& polygon = polygons[i];
+
+        for (int k = 0; k < polygon.size(); ++ k) {
+            auto index = polygon[k];
+
+            auto point = points[index];
+
+            if (map.find(point) == std::end(map)) {
+                int newIndex = static_cast<int>(m_newVertices.size());
+
+                m_newVertices.push_back(point);
+                polygon[k] = newIndex;
+
+                map[point] = newIndex;
+            } else {
+                int newIndex = map[point];
+                polygon[k] = newIndex;
+            }
+        }
+    }
+
+    for (auto& p : m_newVertices) {
+        p = {Clamp(p[0]), Clamp(p[1]), Clamp(p[2])};
+    }
+
+    int remove_cnt = points.size() - m_newVertices.size();
+    points = m_newVertices;
+    return remove_cnt;
+}
+
+std::vector<CMesh::Point> SortPoints(const std::vector<CMesh::Point>& input)
+{
+    auto points = input;
+    std::sort(std::begin(points), std::end(points), [](const auto& lhs, const auto& rhs){
+        return std::tie(lhs[0], lhs[2], lhs[1]) < std::tie(rhs[0], rhs[2], rhs[1]);
+
+        if (lhs[0] > rhs[0])
+            return true;
+
+        if (lhs[1] > rhs[1])
+            return true;
+
+        return lhs[2] > rhs[2];
+    });
+    return points;
+}
+
+void PrintSortedPoints(const std::vector<CMesh::Point>& points)
+{
+    for (const auto p : points) {
+        spdlog::info("{}, {}, {}", p[0], p[1], p[2]);
+    }
 }
