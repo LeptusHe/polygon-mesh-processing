@@ -13,8 +13,8 @@ using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 namespace pmp = CGAL::Polygon_mesh_processing;
 
 //using Kernal = CGAL::Exact_predicates_inexact_constructions_kernel;
-using Kernal = CGAL::Simple_cartesian<float>;
-using CMesh = CGAL::Surface_mesh<Kernal::Point_3>;
+using Kernel = CGAL::Simple_cartesian<float>;
+using CMesh = CGAL::Surface_mesh<Kernel::Point_3>;
 
 namespace meshlib {
 

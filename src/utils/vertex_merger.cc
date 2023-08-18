@@ -217,14 +217,6 @@ std::vector<CMesh::Point> SortPoints(const std::vector<CMesh::Point>& input)
     auto points = input;
     std::sort(std::begin(points), std::end(points), [](const auto& lhs, const auto& rhs){
         return std::tie(lhs[0], lhs[2], lhs[1]) < std::tie(rhs[0], rhs[2], rhs[1]);
-
-        if (lhs[0] > rhs[0])
-            return true;
-
-        if (lhs[1] > rhs[1])
-            return true;
-
-        return lhs[2] > rhs[2];
     });
     return points;
 }

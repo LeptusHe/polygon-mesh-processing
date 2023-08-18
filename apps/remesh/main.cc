@@ -23,6 +23,7 @@
 #include <CGAL/polygon_mesh_processing/remesh_planar_patches.h>
 #include <CGAL/polygon_mesh_processing/polygon_mesh_to_polygon_soup.h>
 #include <CGAL/polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
+#include <CGAL/polygon_mesh_processing/orientation.h>
 #include <igl/file_dialog_open.h>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -629,12 +630,16 @@ int main(int argc, char *argv[])
 
                 pmp::repair_polygon_soup(points, polygon);
 
+                auto another_num_removed = pmp::merge_duplicate_points_in_polygon_soup(points, polygon);
+                spdlog::info("remove again vertex: {}", another_num_removed);
+
+
                 //auto stitch_cnt = pmp::stitch_borders(cloneMesh);
                 //std::cout << "stitch count: " << stitch_cnt << std::endl;
 
                 //pmp::remove_degenerate_edges()
                 //pmp::remove_degenerate_faces()
-                if (pmp::orient_polygon_soup(points, polygon)) {
+                if (!pmp::orient_polygon_soup(points, polygon)) {
                     spdlog::info("invalid orient");
                 }
 
@@ -646,12 +651,49 @@ int main(int argc, char *argv[])
                 num_comp = pmp::connected_components(clean_mesh, f_map);
                 spdlog::info("after clone mesh component num: {}", num_comp);
 
+                pmp::orient(clean_mesh);
+
                 int stitch_cnt = pmp::stitch_boundary_cycles(clean_mesh);
                 spdlog::info("stitch count: {}", stitch_cnt);
 
+                auto col_map = clean_mesh.add_property_map<CMesh::Vertex_index, Eigen::Vector3d>("v:colors").first;
+                for (auto vh : clean_mesh.vertices()) {
+                    col_map[vh] = Eigen::Vector3d(1, 1, 1);
+                }
+
+                int count = 0;
+                float cos_theta = 0.99;
+                int border_cnt = 0;
+                auto point_map = clean_mesh.points();
+                for (auto e : CGAL::edges(clean_mesh)) {
+                    auto half_edge = clean_mesh.halfedge(e);
+                    auto sv = clean_mesh.source(half_edge);
+                    auto dv = clean_mesh.target(half_edge);
+
+                    if (clean_mesh.is_border(e)) {
+                        border_cnt += 1;
+
+                        col_map[sv] = Eigen::Vector3d(1, 0, 0);
+                        col_map[dv] = Eigen::Vector3d(1, 0, 0);
+
+                        continue;
+                    }
+
+                    if (!pmp::Planar_segmentation::is_edge_between_coplanar_faces<Kernel>(e, clean_mesh, cos_theta, point_map)) {
+                        col_map[sv] = Eigen::Vector3d(0, 1, 0);
+                        col_map[dv] = Eigen::Vector3d(0, 1, 0);
+
+                        pmp::Planar_segmentation::is_edge_between_coplanar_faces<Kernel>(e, clean_mesh, cos_theta, point_map);
+
+                        count += 1;
+                    }
+                }
+                spdlog::info("border edge: {}", border_cnt);
+                spdlog::info("invalid edge: {0}", count);
+
 
                 CMesh outMesh;
-                pmp::remesh_planar_patches(clean_mesh, outMesh);
+                pmp::remesh_planar_patches(clean_mesh, outMesh, pmp::parameters::cosine_of_maximum_angle(cos_theta));
                                            //pmp::parameters::cosine_of_maximum_angle(0.99));
                 //pmp::remesh_almost_planar_patches(cloneMesh, outMesh);
                 outMesh.collect_garbage();
@@ -662,7 +704,7 @@ int main(int argc, char *argv[])
                 num_comp = pmp::connected_components(outMesh, f_map);
                 spdlog::info("remesh component num: {}", num_comp);
 
-                meshlib::MeshUtils::ConvertMeshToViewer(outMesh, viewer);
+                meshlib::MeshUtils::ConvertMeshToViewer(clean_mesh, viewer);
 
                 spdlog::info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
                 spdlog::info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());
@@ -670,7 +712,7 @@ int main(int argc, char *argv[])
 
                 for (auto vertex : outMesh.vertices()) {
                     auto point = outMesh.point(vertex);
-                    spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
+                    //spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
                 }
 
                 WriteMesh(outMesh, "data/remesh-result.obj");

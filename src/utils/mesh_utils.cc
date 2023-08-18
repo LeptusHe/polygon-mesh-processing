@@ -39,11 +39,19 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 void MeshUtils::ConvertMeshToViewer(const CMesh& mesh, igl::opengl::glfw::Viewer& viewer)
 {
     Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.vertices().size(), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.num_vertices(), 3);
     Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.faces().size(), 3);
+
+    auto pair = mesh.property_map<CMesh::Vertex_index, Eigen::Vector3d>("v:colors");
 
     for (auto vh : mesh.vertices()) {
         auto vert = mesh.point(vh);
         V.row(vh.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+
+        if (pair.second) {
+            C.row(vh.idx()) = pair.first[vh];
+        }
+
     }
 
     for (auto fh : mesh.faces()) {
@@ -58,6 +66,9 @@ void MeshUtils::ConvertMeshToViewer(const CMesh& mesh, igl::opengl::glfw::Viewer
 
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
+    if (pair.second) {
+        viewer.data().set_colors(C);
+    }
 }
 
 bool MeshUtils::WriteMesh(const Mesh &mesh, const std::string &path)
