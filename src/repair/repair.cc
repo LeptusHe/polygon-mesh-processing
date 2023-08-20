@@ -1,6 +1,11 @@
 #include "repair.h"
+#include "utils/mesh_utils.h"
+#include "utils/vertex_merger.h"
+#include <spdlog/spdlog.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_hole.h>
 #include <CGAL/Polygon_mesh_processing/border.h>
+#include <CGAL/polygon_mesh_processing/polygon_mesh_to_polygon_soup.h>
+#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 
 bool IsSmallHole(CMesh::halfedge_index h, const CMesh& mesh, double max_hole_diam, int max_num_hole_edges)
 {
@@ -49,4 +54,26 @@ int FillSmallHoles(CMesh& mesh, double max_hole_diam, int max_num_hole_edge)
         }
     }
     return hole_cnt;
+}
+
+CMesh Repair(const CMesh& mesh)
+{
+    std::vector<CMesh::Point> points;
+    std::vector<std::vector<std::size_t>> polygon;
+    pmp::polygon_mesh_to_polygon_soup(mesh, points, polygon);
+
+    int num_removed = pmp::merge_duplicate_points_in_polygon_soup(points, polygon);
+    num_removed = RemoveDuplicationVertex(points, polygon);
+    auto reverse_faces = FixInvalidOrientation(points, polygon);
+
+    auto another_num_removed = pmp::merge_duplicate_points_in_polygon_soup(points, polygon);
+    auto num_faces = pmp::merge_duplicate_polygons_in_polygon_soup(points, polygon);
+    pmp::repair_polygon_soup(points, polygon);
+    if (!pmp::orient_polygon_soup(points, polygon)) {
+        spdlog::info("invalid orient");
+    }
+
+    CMesh clean_mesh;
+    pmp::polygon_soup_to_polygon_mesh(points, polygon, clean_mesh);
+    return clean_mesh;
 }

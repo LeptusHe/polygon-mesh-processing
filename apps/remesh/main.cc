@@ -583,6 +583,7 @@ int main(int argc, char *argv[])
 
                 int hole_cnt = 0;
                 do {
+                    cloneMesh = Repair(cloneMesh);
                     pmp::merge_duplicated_vertices_in_boundary_cycles(cloneMesh);
                     pmp::stitch_boundary_cycles(cloneMesh);
                     pmp::stitch_borders(cloneMesh);
@@ -674,8 +675,8 @@ int main(int argc, char *argv[])
                     spdlog::info("invalid orient");
                 }
 
-                reverse_faces = FixInvalidOrientation(points, polygon);
-                spdlog::info("reverse faces: {}", reverse_faces);
+                //reverse_faces = FixInvalidOrientation(points, polygon);
+                //spdlog::info("reverse faces: {}", reverse_faces);
 
                 CMesh clean_mesh;
                 pmp::polygon_soup_to_polygon_mesh(points, polygon, clean_mesh);
@@ -709,13 +710,14 @@ int main(int argc, char *argv[])
                 pmp::orient(clean_mesh);
                 pmp::merge_reversible_connected_components(clean_mesh);
 
-
                 clean_mesh.collect_garbage();
+
+                clean_mesh = Repair(clean_mesh);
                 spdlog::info("stitch count: {}", stitch_cnt);
 
 
-                auto invalid_edges_cnt = meshlib::CheckInvalidEdges(clean_mesh);
-                spdlog::info(invalid_edges_cnt);
+                //auto invalid_edges_cnt = meshlib::CheckInvalidEdges(clean_mesh);
+                //spdlog::info(invalid_edges_cnt);
 
 
                 //auto non_manifold_vertex_cnt = pmp::duplicate_non_manifold_vertices(clean_mesh);
