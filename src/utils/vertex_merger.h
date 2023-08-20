@@ -21,5 +21,6 @@ private:
 
 
 int RemoveDuplicationVertex(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons);
+int FixInvalidOrientation(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons);
 std::vector<CMesh::Point> SortPoints(const std::vector<CMesh::Point>& input);
 void PrintSortedPoints(const std::vector<CMesh::Point>& points);

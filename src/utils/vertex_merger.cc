@@ -1,5 +1,6 @@
 #include "vertex_merger.h"
 #include <spdlog/spdlog.h>
+#include <CGAL/Simple_cartesian.h>
 
 namespace {
 
@@ -210,6 +211,42 @@ int RemoveDuplicationVertex(std::vector<CMesh::Point>& points, std::vector<std::
     int remove_cnt = points.size() - m_newVertices.size();
     points = m_newVertices;
     return remove_cnt;
+}
+
+int FixInvalidOrientation(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons)
+{
+    int reverse_cnt = 0;
+
+    auto new_polygons = polygons;
+
+    for (int i = 0; i < polygons.size(); ++ i) {
+        const auto& polygon = polygons[i];
+        auto v0_index = polygon[0];
+        auto v1_index = polygon[1];
+        auto v2_index = polygon[2];
+
+        auto p0 = points[v0_index];
+        auto p1 = points[v1_index];
+        auto p2 = points[v2_index];
+
+        auto e1 = p1 - p0;
+        auto e2 = p2 - p0;
+        auto face_n = CGAL::cross_product(e1, e2);
+        auto n = Kernel::Vector_3(0, 1, 0);
+
+        auto new_polygon = polygon;
+        if (CGAL::scalar_product(n, face_n) < 0) {
+            new_polygon = {
+                    v2_index,
+                    v1_index,
+                    v0_index
+            };
+            reverse_cnt += 1;
+        }
+        new_polygons[i] = new_polygon;
+    }
+    polygons = new_polygons;
+    return reverse_cnt;
 }
 
 std::vector<CMesh::Point> SortPoints(const std::vector<CMesh::Point>& input)

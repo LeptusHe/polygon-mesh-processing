@@ -4,6 +4,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 
 #include <CGAL/Cartesian.h>
+#include <CGAL/Simple_cartesian.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
@@ -24,5 +25,8 @@ public:
     static void ConvertMeshToViewer(const CMesh& mesh, igl::opengl::glfw::Viewer& viewer);
     static bool WriteMesh(const Mesh& mesh, const std::string& path);
 };
+
+int CheckInvalidEdges(CMesh& clean_mesh);
+
 
 } // namespace meshlib

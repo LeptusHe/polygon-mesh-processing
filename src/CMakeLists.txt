@@ -16,7 +16,7 @@ add_library(meshlib STATIC
     simplification/simplification.cc
     simplification/simplification.h
     visualization/mesh_vis.cc
-    visualization/mesh_vis.h)
+    repair/repair.cc)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")
 target_compile_definitions(meshlib PUBLIC _USE_MATH_DEFINES)
