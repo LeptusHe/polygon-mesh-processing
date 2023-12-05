@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "bounds.h"
 
 class IterativeCluster {
 public:
@@ -8,6 +9,8 @@ public:
         int maxIterationNum = 100;
         float maxChartArea = 0.0f;
         float normalWeight = 1.05f;
+        bool enableUVbounds = false;
+        Eigen::Vector2f maxUVSize;
     };
 
 private:
@@ -15,30 +18,36 @@ private:
 
 public:
     IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp);
-    void Run(const IterativeCluster::Options& options);
+    void Run(const Options& options);
     Mesh::FaceHandle RegionGrowSync(std::vector<Mesh::FaceHandle>& newSeeds);
-    float CalculateCost(const Mesh::Normal& chartNormal, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace);
+    float CalculateCost(const Mesh::Normal& chartNormal, Bounds uvBounds, const Mesh::FaceHandle& oldFace, const Mesh::FaceHandle& newFace);
     void InitSeed();
     void ClearClusterProp();
     void UpdateClusterCenters();
     Mesh GetClusterMesh(int clusterId);
-    bool IsConverged() const;
+    [[nodiscard]] bool IsConverged() const;
     std::vector<Mesh::FaceHandle> GetChartCenters() { return m_seeds; }
     Mesh::FaceHandle FindCenterOfMesh(const Mesh& mesh);
     void AddSeed(const Mesh::FaceHandle& fh);
-    size_t GetClusterCount() const { return m_seeds.size(); }
+    [[nodiscard]] size_t GetClusterCount() const { return m_seeds.size(); }
+    [[nodiscard]] const std::vector<Bounds>& GetChartUVBounds() const { return m_chartUVBounds; }
 
-    bool Init(const IterativeCluster::Options& options);
+    bool Init(const Options& options);
     bool UpdateCluster();
+
+private:
+    [[nodiscard]] Bounds CalculateUVBoundsForFace(const Mesh::FaceHandle& faceHandle) const;
+    [[nodiscard]] Bounds EnclapseMeshFace(Bounds& bounds, const Mesh::FaceHandle& face_handle) const;
 
 private:
     Mesh& m_mesh;
     Options m_options;
 
     OpenMesh::FProp<int>& m_clusterProp;
-    std::vector<Mesh::Normal> m_clusterNormals;
     std::vector<Mesh> m_chartMeshes;
     std::vector<float> m_chartAreas;
+    std::vector<Mesh::Normal> m_clusterNormals;
+    std::vector<Bounds> m_chartUVBounds;
 
     std::vector<OpenMesh::FaceHandle> m_newSeeds;
     std::vector<Mesh::FaceHandle> m_prevSeeds;

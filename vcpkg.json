@@ -17,5 +17,8 @@
   }, {
     "name" : "cgal",
     "version>=" : "5.6"
+  }, {
+    "name" : "nlohmann-json",
+    "version>=" : "3.11.2"
   } ]
 }

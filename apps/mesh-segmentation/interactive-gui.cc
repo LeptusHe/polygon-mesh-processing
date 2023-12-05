@@ -6,12 +6,16 @@
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <imgui.h>
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
+#include "filesys/filesys.h"
 #include "iterative-cluster.h"
 #include "visualization/color_set_generator.h"
 
+namespace fs = std::filesystem;
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
 void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
@@ -26,16 +30,40 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     std::cout << fmt::format("half edge count: {}\n\n", mesh.n_halfedges());
 
     float area = 0.0f;
-    for (auto faceHandle : mesh.faces()) {
-        area += mesh.calc_face_area(faceHandle);
+    for (const auto faceHandle : mesh.faces()) {
+        area += mesh.calc_face_area(static_cast<Mesh::FaceHandle>(faceHandle));
     }
     std::cout << fmt::format("total area: {}\n", area);
+}
+
+void PrintClusterInfo(const IterativeCluster& cluster)
+{
+    const auto cluster_cnt = cluster.GetClusterCount();
+
+
 }
 
 
 int interactive(int argc, char *argv[])
 {
-    auto path = argc > 1 ? argv[1] : "data/quad.obj";
+    FileManager::AddSearchPath("./");
+    FileManager::AddSearchPath("./../../data");
+
+    const auto config_file_name = "data/config.json";
+    if (!fs::exists(config_file_name)) {
+        spdlog::error("failed to find {} file", config_file_name);
+        return  -1;
+    }
+
+    std::ifstream fin(config_file_name);
+    auto json_data = nlohmann::json::parse(fin);
+
+    const auto file_name = json_data["input-file"].get<std::string>();
+    const auto path = FileManager::FindFile(file_name);
+    if (path.empty()) {
+        spdlog::error("failed to find input mesh file: {0}", file_name);
+        return -1;
+    }
 
     Mesh mesh;
     OpenMesh::IO::Options opt;
@@ -80,26 +108,25 @@ int interactive(int argc, char *argv[])
     auto clusterProp = OpenMesh::FProp<int>(mesh, "cluster");
     IterativeCluster cluster(mesh, clusterProp);
 
-    int maxIteration = 100;
+    auto options_data = json_data["segmentation-options"];
 
     IterativeCluster::Options options;
-    options.maxChartArea = 100.0f;
-    options.minClusterCnt = std::ceil(area / options.maxChartArea);
-    options.maxIterationNum = maxIteration;
-    options.normalWeight = 1.05f;
+    options.maxChartArea = options_data["max-chart-area"].get<float>();
+    options.minClusterCnt = options.maxChartArea > 0 ? static_cast<int>(std::ceil(area / options.maxChartArea)) : 1;
+    options.maxIterationNum = options_data["max-iteration-num"].get<int>();
+    options.normalWeight = options_data["normal-weight"].get<float>();
+    options.enableUVbounds = options_data["enable-uv-bounds"].get<bool>();
+
+    auto max_uv_size = Eigen::Vector2f(8.0f, 8.0f);
+    max_uv_size.x() = options_data["max-uv-size-x"].get<float>();
+    max_uv_size.y() = options_data["max-uv-size-y"].get<float>();
+    options.maxUVSize = max_uv_size;
 
     cluster.Init(options);
-    //cluster.Init(clusterCnt, 1.1f, maxIterationNum);
-    //cluster.Run(minClusterCnt, 1., maxIterationNum);
-
-    //cluster.InitSeed();
-    //cluster.RegionGrow();
 
     igl::opengl::glfw::Viewer viewer;
-
     igl::opengl::glfw::imgui::ImGuiPlugin plugin;
     viewer.plugins.push_back(&plugin);
-
     igl::opengl::glfw::imgui::ImGuiMenu menu;
     plugin.widgets.push_back(&menu);
 
@@ -128,29 +155,29 @@ int interactive(int argc, char *argv[])
         auto centers = cluster.GetChartCenters();
         for (const auto fh : centers) {
             auto clusterId = clusterProp[fh];
-            auto color = colors[clusterId];
+            //auto color = colors[clusterId];
             //C.row(fh.idx()) = 0.5 * color; //Eigen::Vector3d{0, 0, 0};
         }
     };
 
 
     int clusterColorIndex = 0;
+    int maxIteration = options.maxIterationNum;
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
         if (ImGui::InputInt("max iteration", &maxIteration)) {
             options.maxIterationNum = maxIteration;
-
             cluster.Run(options);
             set_color_to_mesh();
         }
 
         if (ImGui::Button("output chart area")) {
-            auto clusterCount = cluster.GetClusterCount();
-            std::vector<float> areas(clusterCount, 0.0f);
+            const auto clusterCount = cluster.GetClusterCount();
+            std::vector areas(clusterCount, 0.0f);
 
-            for (auto faceHandle : mesh.faces()) {
-                auto clusterId = clusterProp[faceHandle];
+            for (const auto faceHandle : mesh.faces()) {
+                const auto clusterId = clusterProp[faceHandle];
                 areas[clusterId] += mesh.calc_face_area(faceHandle);
             }
 
@@ -164,7 +191,7 @@ int interactive(int argc, char *argv[])
 
         if (ImGui::InputInt("cluster index", &clusterColorIndex)) {
             for (auto faceHandle : mesh.faces()) {
-                auto clusterId = clusterProp[faceHandle];
+                const auto clusterId = clusterProp[static_cast<Mesh::FaceHandle>(faceHandle)];
                 if (clusterId == clusterColorIndex) {
                     C.row(faceHandle.idx()) = Eigen::Vector3d{1, 0, 0};
                 } else {
@@ -176,7 +203,7 @@ int interactive(int argc, char *argv[])
 
         if (ImGui::Button("display boundary")) {
             for (auto fh : mesh.faces()) {
-                if (mesh.is_boundary(fh)) {
+                if (mesh.is_boundary(static_cast<Mesh::FaceHandle>(fh))) {
                     C.row(fh.idx()) = Eigen::Vector3d{1, 0, 0};
                 } else {
                     C.row(fh.idx()) = Eigen::Vector3d{0, 0, 0};
@@ -186,7 +213,7 @@ int interactive(int argc, char *argv[])
         }
     };
 
-    viewer.callback_key_down = [&](igl::opengl::glfw::Viewer& viewer, unsigned char key, int mod) {
+    viewer.callback_key_down = [&](igl::opengl::glfw::Viewer& v, const unsigned char key, int mod) {
         if (key == 'N') {
             maxIteration += 1;
             options.maxIterationNum = maxIteration;
@@ -197,10 +224,22 @@ int interactive(int argc, char *argv[])
         return false;
     };
 
-    viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer& viewer) {
+    bool is_converaged = false;
+    viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer& v) {
         if (cluster.UpdateCluster()) {
             set_color_to_mesh();
-            viewer.data().set_colors(C);
+            v.data().set_colors(C);
+        } else {
+            if (!is_converaged) {
+                const auto& uv_bounds = cluster.GetChartUVBounds();
+                for (const auto& uv_bound : uv_bounds) {
+                    const auto size = uv_bound.size();
+                    spdlog::info("uv bounds - [{}, {}]", size.x(), size.y());
+                }
+
+                is_converaged = true;
+                spdlog::info("succeed to converaged, chart count: {}", cluster.GetClusterCount());
+            }
         }
         return false;
     };
