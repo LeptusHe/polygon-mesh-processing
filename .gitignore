@@ -4,6 +4,10 @@ data/result/*
 imgui.ini
 logs/*
 
+# model files
+*.fbx
+*.obj
+
 # Jetbrains
 .idea/*
 cmake-build-*/*
