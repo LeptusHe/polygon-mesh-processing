@@ -599,6 +599,7 @@ int main(int argc, char *argv[])
                 } while (hole_cnt > 0);
 
                 meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+                WriteMesh(cloneMesh, "data/remesh-grid.obj");
 
                 cmesh = cloneMesh;
             }
@@ -616,7 +617,14 @@ int main(int argc, char *argv[])
                 //pmp::remesh
                 auto cloneMesh = cmesh;
 
+                int small_hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
+
+
                 //int invalid_edges_cnt = meshlib::CheckInvalidEdges(cloneMesh);
+                pmp::remove_degenerate_edges(cloneMesh);
+                //pmp::remove_degenerate_faces(cloneMesh);
+                //invalid_edges_cnt = meshlib::CheckInvalidEdges(cloneMesh);
+                small_hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
                 //spdlog::info("invalid edges: {}", invalid_edges_cnt);
 
                 auto f_map = cloneMesh.add_property_map<CMesh::Face_index, int>("f:component-id").first;
@@ -716,12 +724,18 @@ int main(int argc, char *argv[])
                 spdlog::info("stitch count: {}", stitch_cnt);
 
 
-                //auto invalid_edges_cnt = meshlib::CheckInvalidEdges(clean_mesh);
-                //spdlog::info(invalid_edges_cnt);
-
+                auto invalid_edges_cnt = meshlib::CheckInvalidEdges(clean_mesh);
+                spdlog::info(invalid_edges_cnt);
 
                 //auto non_manifold_vertex_cnt = pmp::duplicate_non_manifold_vertices(clean_mesh);
                 //spdlog::info("duplicate non manifold vertex: {}", non_manifold_vertex_cnt);
+
+                // output vertexs
+                pmp::polygon_mesh_to_polygon_soup(clean_mesh, points, polygon);
+                for (int i = 0; i < points.size(); ++ i) {
+                    auto p = points[i];
+                    spdlog::info("v:{}, {}, {}, {}", i, p.x(), p.y(), p.z());
+                }
 
                 CMesh outMesh;
                 float cos_theta = 0.99;
@@ -735,7 +749,8 @@ int main(int argc, char *argv[])
                 num_comp = pmp::connected_components(outMesh, f_map);
                 spdlog::info("remesh component num: {}", num_comp);
 
-                meshlib::MeshUtils::ConvertMeshToViewer(outMesh, viewer);
+                CollapseBoundaryEdge(outMesh);
+                meshlib::MeshUtils::ConvertMeshToViewer(clean_mesh, viewer);
 
                 spdlog::info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
                 spdlog::info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());

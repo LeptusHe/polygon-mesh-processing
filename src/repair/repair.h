@@ -4,4 +4,5 @@
 
 int FillSmallHoles(CMesh& mesh, double max_hole_diam, int max_num_hole_edge);
 CMesh Repair(const CMesh& mesh);
+bool CollapseBoundaryEdge(CMesh& cmesh);
 

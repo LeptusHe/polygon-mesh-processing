@@ -27,6 +27,7 @@ public:
 };
 
 int CheckInvalidEdges(CMesh& clean_mesh);
-
+Mesh ConvertToMesh(const CMesh& cmesh);
+CMesh ConvertOpenMeshToSurfaceMesh(const Mesh& mesh);
 
 } // namespace meshlib
