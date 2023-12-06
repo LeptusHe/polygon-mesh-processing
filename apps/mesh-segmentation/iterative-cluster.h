@@ -34,10 +34,11 @@ public:
 
     bool Init(const Options& options);
     bool UpdateCluster();
+    std::vector<Mesh> Unwrap();
 
 private:
     [[nodiscard]] Bounds CalculateUVBoundsForFace(const Mesh::FaceHandle& faceHandle) const;
-    [[nodiscard]] Bounds EnclapseMeshFace(Bounds& bounds, const Mesh::FaceHandle& face_handle) const;
+    [[nodiscard]] Bounds EncapsulateMeshFace(Bounds& bounds, const Mesh::FaceHandle& face_handle) const;
 
 private:
     Mesh& m_mesh;

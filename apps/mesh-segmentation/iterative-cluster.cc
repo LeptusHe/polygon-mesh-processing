@@ -223,7 +223,7 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>&
 
         // update data
         auto uvBounds = m_chartUVBounds[clusterId];
-        uvBounds = EnclapseMeshFace(uvBounds, fh);
+        uvBounds = EncapsulateMeshFace(uvBounds, fh);
         m_chartUVBounds[clusterId] = uvBounds;
 
         m_clusterProp[fh] = clusterId;
@@ -306,7 +306,7 @@ void IterativeCluster::ClearClusterProp()
 
 Mesh IterativeCluster::GetClusterMesh(int clusterId)
 {
-    auto mesh = m_mesh;
+    Mesh mesh = m_mesh;
 
     for (auto fh : mesh.faces()) {
         if (m_clusterProp[fh] != clusterId) {
@@ -418,11 +418,44 @@ Bounds IterativeCluster::CalculateUVBoundsForFace(const Mesh::FaceHandle& faceHa
     return bounds;
 }
 
-Bounds IterativeCluster::EnclapseMeshFace(Bounds& bounds, const Mesh::FaceHandle& face_handle) const
+Bounds IterativeCluster::EncapsulateMeshFace(Bounds& bounds, const Mesh::FaceHandle& face_handle) const
 {
     for (const auto vh : m_mesh.fv_range(face_handle)) {
         auto p = m_mesh.point(static_cast<Mesh::VertexHandle>(vh));
         bounds.Encapsulate(Eigen::Vector2f(p[0], p[2]));
     }
     return bounds;
+}
+
+std::vector<Mesh> IterativeCluster::Unwrap()
+{
+    if (!m_options.enableUVbounds) {
+        spdlog::error("failed to unwrap uv because uv bounds not enabled");
+        return {};
+    }
+
+    std::vector<Mesh> chart_meshes;
+    const auto chart_cnt = GetClusterCount();
+    for (int chart_idx = 0; chart_idx < chart_cnt; ++ chart_idx) {
+        auto chart_mesh = GetClusterMesh(chart_idx);
+        chart_mesh.garbage_collection();
+
+        chart_mesh.request_vertex_texcoords2D();
+
+        const auto& chart_uv_bounds = m_chartUVBounds[chart_idx];
+        const auto& uv_size = chart_uv_bounds.size();
+        for (const auto vh : chart_mesh.vertices()) {
+            const auto p = chart_mesh.point(vh);
+
+            Eigen::Vector2f uv(p[0], p[2]);
+            uv = uv - chart_uv_bounds.min;
+            uv.x() = uv.x() / uv_size.x();
+            uv.y() = uv.y() / uv_size.y();
+
+            Mesh::TexCoord2D coord(2 * chart_idx + uv.x(), uv.y());
+            chart_mesh.set_texcoord2D(vh, coord);
+        }
+        chart_meshes.emplace_back(chart_mesh);
+    }
+    return chart_meshes;
 }

@@ -14,6 +14,7 @@
 #include "filesys/filesys.h"
 #include "iterative-cluster.h"
 #include "visualization/color_set_generator.h"
+#include "interactive-gui.h"
 
 namespace fs = std::filesystem;
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -35,14 +36,6 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     }
     std::cout << fmt::format("total area: {}\n", area);
 }
-
-void PrintClusterInfo(const IterativeCluster& cluster)
-{
-    const auto cluster_cnt = cluster.GetClusterCount();
-
-
-}
-
 
 int interactive(int argc, char *argv[])
 {
@@ -83,10 +76,11 @@ int interactive(int argc, char *argv[])
     mesh.request_vertex_status();
     mesh.request_edge_status();
     mesh.request_face_status();
+    mesh.request_vertex_texcoords2D();
 
-    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
-    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
-    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_faces(), 3);
+    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(static_cast<int>(mesh.n_vertices()), 3);
+    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(static_cast<int>(mesh.n_faces()), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(static_cast<int>(mesh.n_faces()), 3);
 
     for (auto vertHandle : mesh.vertices()) {
         auto vert = mesh.point(vertHandle);
@@ -131,12 +125,12 @@ int interactive(int argc, char *argv[])
     plugin.widgets.push_back(&menu);
 
     int totalClusterCnt = options.minClusterCnt + 10; // static_cast<int>(cluster.GetClusterCount());
-    ColorSetGenerator colorSetGenerator(totalClusterCnt);
-    auto colors = colorSetGenerator.GetColorSet();
+    //ColorSetGenerator colorSetGenerator(totalClusterCnt);
+    //auto colors = colorSetGenerator.GetColorSet();
 
     auto set_color_to_mesh = [&]() {
         auto count = cluster.GetClusterCount();
-        auto colorGenerator = ColorSetGenerator(count);
+        auto colorGenerator = ColorSetGenerator(static_cast<int>(count));
         auto colors = colorGenerator.GetColorSet();
 
         for (auto faceHandle: mesh.faces()) {
@@ -224,21 +218,24 @@ int interactive(int argc, char *argv[])
         return false;
     };
 
-    bool is_converaged = false;
+    bool is_converged = false;
     viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer& v) {
         if (cluster.UpdateCluster()) {
             set_color_to_mesh();
             v.data().set_colors(C);
         } else {
-            if (!is_converaged) {
+            if (!is_converged) {
                 const auto& uv_bounds = cluster.GetChartUVBounds();
                 for (const auto& uv_bound : uv_bounds) {
                     const auto size = uv_bound.size();
                     spdlog::info("uv bounds - [{}, {}]", size.x(), size.y());
                 }
 
-                is_converaged = true;
-                spdlog::info("succeed to converaged, chart count: {}", cluster.GetClusterCount());
+                const auto chart_meshes = cluster.Unwrap();
+                WriteChartMesh("plane", chart_meshes);
+
+                is_converged = true;
+                spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
             }
         }
         return false;
@@ -271,4 +268,52 @@ int interactive(int argc, char *argv[])
     viewer.launch();
 
     return 0;
+}
+
+
+void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart_meshes)
+{
+    const OpenMesh::IO::Options option = OpenMesh::IO::Options::VertexTexCoord;
+
+    for (int i = 0; i < chart_meshes.size(); ++ i) {
+        const auto& chart_mesh = chart_meshes[i];
+        auto file_path = fmt::format("data/result/{0}_{1}.obj", file_name, i);
+        OpenMesh::IO::write_mesh(chart_mesh, file_path, option);
+    }
+
+    Mesh merged_mesh;
+    merged_mesh.request_vertex_texcoords2D();
+
+    for (const auto& chart_mesh : chart_meshes) {
+        MergeMesh(merged_mesh, chart_mesh);
+    }
+
+    const std::string mesh_file_path = fmt::format("data/result/{0}.obj", file_name);
+    OpenMesh::IO::write_mesh(merged_mesh, mesh_file_path, option);
+}
+
+Mesh MergeMesh(Mesh& merged_mesh, const Mesh& input_mesh)
+{
+    std::unordered_map<int, int> vertex_map;
+
+    for (const auto vh : input_mesh.vertices()) {
+        const auto p = input_mesh.point(vh);
+        const auto uv = input_mesh.texcoord2D(vh);
+
+        const auto new_vh = merged_mesh.add_vertex(p);
+        merged_mesh.set_texcoord2D(new_vh, uv);
+
+        vertex_map[vh.idx()] = new_vh.idx();
+    }
+
+    for (const auto fh : input_mesh.faces()) {
+        std::vector<Mesh::VertexHandle> face_handles;
+        for (const auto vh : input_mesh.fv_range(fh)) {
+            const auto new_vh_idx = vertex_map[vh.idx()];
+            auto new_vh = merged_mesh.vertex_handle(new_vh_idx);
+            face_handles.push_back(new_vh);
+        }
+        merged_mesh.add_face(face_handles);
+    }
+    return merged_mesh;
 }
