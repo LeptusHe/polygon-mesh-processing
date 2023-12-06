@@ -15,6 +15,7 @@
 #include "iterative-cluster.h"
 #include "visualization/color_set_generator.h"
 #include "interactive-gui.h"
+#include "chart-packer.h"
 
 namespace fs = std::filesystem;
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -290,6 +291,38 @@ void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart
 
     const std::string mesh_file_path = fmt::format("data/result/{0}.obj", file_name);
     OpenMesh::IO::write_mesh(merged_mesh, mesh_file_path, option);
+
+    xatlas::PackOptions pack_options;
+    pack_options.bruteForce = true;
+    pack_options.resolution = 1024;
+    pack_options.texelsPerUnit = 1024;
+
+    /*
+    if (!Pack(merged_mesh, pack_options)) {
+        spdlog::error("failed to pack uv chart");
+        return;
+    } else {
+        spdlog::info("succeed to pack uv chart");
+    }
+
+    const std::string uv_mesh_file_path = fmt::format("data/result/{0}_pack.obj", file_name);
+    OpenMesh::IO::write_mesh(merged_mesh, uv_mesh_file_path, option);
+    */
+
+    std::vector<Mesh> atlas_meshes;
+    if (!Pack(merged_mesh, pack_options, atlas_meshes)) {
+        spdlog::error("failed to pack uv chart");
+        return;
+    } else {
+        spdlog::info("succeed to pack uv chart");
+    }
+
+    for (int i = 0; i < atlas_meshes.size(); ++ i) {
+        const auto& atlas_mesh = atlas_meshes[i];
+        const auto atlas_mesh_file_path = fmt::format("data/result/atlas_{0}.obj", i);
+
+        OpenMesh::IO::write_mesh(atlas_mesh, atlas_mesh_file_path, option);
+    }
 }
 
 Mesh MergeMesh(Mesh& merged_mesh, const Mesh& input_mesh)

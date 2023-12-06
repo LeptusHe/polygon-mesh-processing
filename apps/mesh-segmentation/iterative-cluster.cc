@@ -294,7 +294,7 @@ float IterativeCluster::CalculateCost(const Mesh::Normal& chartNormal, Bounds uv
         }
     }
 
-    return (m_options.normalWeight - n) * d + uv_bounds_cost * 100.0f;
+    return (m_options.normalWeight - n) * d + uv_bounds_cost * 1.0f;
 }
 
 void IterativeCluster::ClearClusterProp()
@@ -439,7 +439,6 @@ std::vector<Mesh> IterativeCluster::Unwrap()
     for (int chart_idx = 0; chart_idx < chart_cnt; ++ chart_idx) {
         auto chart_mesh = GetClusterMesh(chart_idx);
         chart_mesh.garbage_collection();
-
         chart_mesh.request_vertex_texcoords2D();
 
         const auto& chart_uv_bounds = m_chartUVBounds[chart_idx];

@@ -3,7 +3,7 @@
   "segmentation-options" : {
     "max-chart-area" : 0.0,
     "min-cluster-cnt" : 1,
-    "max-iteration-num" : 100,
+    "max-iteration-num" : 15,
     "normal-weight" : 1.05,
     "enable-uv-bounds" : true,
     "max-uv-size-x" : 32.0,
