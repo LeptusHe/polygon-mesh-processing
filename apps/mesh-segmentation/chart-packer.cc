@@ -75,14 +75,14 @@ bool MergeChartIntoAtlasMesh(Mesh& atlas_mesh, const Mesh& src_mesh, const xatla
 {
     const auto chart = mesh.chartArray[chart_idx];
 
-    const int triangle_cnt = static_cast<int>(chart.faceCount) / 3;
-    for (int i = 0; i < triangle_cnt; ++ i) {
+    for (int i = 0; i < chart.faceCount; ++ i) {
+        const auto face_idx = chart.faceArray[i];
+
         std::vector<uint32_t> vert_indices;
 
-        auto idx0 = chart.faceArray[3 * i + 0];
-        auto idx1 = chart.faceArray[3 * i + 1];
-        auto idx2 = chart.faceArray[3 * i + 2];
-
+        auto idx0 = mesh.indexArray[3 * face_idx + 0];
+        auto idx1 = mesh.indexArray[3 * face_idx + 1];
+        auto idx2 = mesh.indexArray[3 * face_idx + 2];
         vert_indices.push_back(idx0);
         vert_indices.push_back(idx1);
         vert_indices.push_back(idx2);
@@ -91,10 +91,14 @@ bool MergeChartIntoAtlasMesh(Mesh& atlas_mesh, const Mesh& src_mesh, const xatla
         for (const auto vert_idx : vert_indices) {
             const auto vt = mesh.vertexArray[vert_idx];
 
-            Mesh::VertexHandle vh(static_cast<int>(vt.xref));
-            auto p = src_mesh.point(vh);
+            const Mesh::VertexHandle vh(static_cast<int>(vt.xref));
+            const auto p = src_mesh.point(vh);
 
             const auto new_vh = atlas_mesh.add_vertex(p);
+
+            Mesh::TexCoord2D uv(vt.uv[0], vt.uv[1]);
+            atlas_mesh.set_texcoord2D(static_cast<Mesh::VertexHandle>(new_vh), uv);
+
             vh_list.push_back(new_vh);
         }
         atlas_mesh.add_face(vh_list);
@@ -103,10 +107,11 @@ bool MergeChartIntoAtlasMesh(Mesh& atlas_mesh, const Mesh& src_mesh, const xatla
     return true;
 }
 
-bool CalculateUVBounds(const Mesh& mesh, Bounds *uv_bounds)
+Bounds* CalculateUVBounds(const Mesh& mesh)
 {
+    Bounds *uv_bounds = nullptr;
     if (mesh.n_vertices() == 0)
-        return false;
+        return uv_bounds;
 
     for (const Mesh::VertexHandle vh : mesh.vertices()) {
         const auto tex_coord = mesh.texcoord2D(vh);
@@ -117,7 +122,7 @@ bool CalculateUVBounds(const Mesh& mesh, Bounds *uv_bounds)
         }
         uv_bounds->Encapsulate(uv);
     }
-    return true;
+    return uv_bounds;
 }
 
 
@@ -129,6 +134,10 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const Mesh& src_
     spdlog::info("atlas count: {}", atlas->atlasCount);
 
     std::vector<Mesh> atlas_meshes(atlas->atlasCount);
+    for (auto& atlas_mesh : atlas_meshes) {
+        atlas_mesh.request_vertex_texcoords2D();
+    }
+
     for (int mesh_index = 0; mesh_index < atlas->meshCount; ++ mesh_index) {
         const auto mesh = atlas->meshes[mesh_index];
 
@@ -141,9 +150,8 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const Mesh& src_
     }
 
     for (auto& atlas_mesh : atlas_meshes) {
-        Bounds *uv_bounds = nullptr;
-        const auto succees = CalculateUVBounds(atlas_mesh, uv_bounds);
-        if (!succees) {
+        const auto uv_bounds = CalculateUVBounds(atlas_mesh);
+        if (!uv_bounds) {
             spdlog::error("failed to calculate uv bounds");
             continue;
         }
@@ -157,6 +165,7 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const Mesh& src_
 
             atlas_mesh.set_texcoord2D(vh, uv);
         }
+        delete uv_bounds;
     }
 
     return atlas_meshes;
