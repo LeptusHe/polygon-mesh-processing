@@ -126,7 +126,7 @@ Bounds* CalculateUVBounds(const Mesh& mesh)
 }
 
 
-std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const Mesh& src_mesh)
+std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const std::function<const Mesh&(int)>& src_mesh_selector)
 {
     if (atlas == nullptr)
         return {};
@@ -145,6 +145,7 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const Mesh& src_
             const auto chart = mesh.chartArray[chart_idx];
 
             auto& atlas_mesh = atlas_meshes[chart.atlasIndex];
+            const auto& src_mesh = src_mesh_selector(mesh_index);
             MergeChartIntoAtlasMesh(atlas_mesh, src_mesh, mesh, chart_idx);
         }
     }
@@ -188,10 +189,34 @@ bool Pack(const Mesh& mesh, const xatlas::PackOptions& pack_options, std::vector
     xatlas::PackCharts(atlas, pack_options);
 
     //SetTextureCoordinate(atlas, 0, mesh);
-    cluster_meshes = GenerateAtlasMesh(atlas, mesh);
+    cluster_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
+        return mesh;
+    });
 
     // TODO: release memory resources
     // release vertex datas
+
+    return true;
+}
+
+bool Pack(const std::vector<Mesh>& chart_meshes, const xatlas::PackOptions& pack_options, std::vector<Mesh>& cluster_meshes)
+{
+    const auto atlas = xatlas::Create();
+
+    for (const auto& chart_mesh : chart_meshes) {
+        const auto uv_mesh_decl = CreateUVMeshDecal(chart_mesh);
+        if (xatlas::AddUvMesh(atlas, uv_mesh_decl) != xatlas::AddMeshError::Success) {
+            spdlog::info("failed to add uv mesh");
+            return false;
+        }
+    }
+
+    xatlas::ComputeCharts(atlas);
+    xatlas::PackCharts(atlas, pack_options);
+
+    cluster_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
+        return chart_meshes[mesh_index];
+    });
 
     return true;
 }

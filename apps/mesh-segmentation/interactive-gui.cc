@@ -295,7 +295,7 @@ void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart
     xatlas::PackOptions pack_options;
     pack_options.bruteForce = true;
     pack_options.resolution = 1024;
-    pack_options.texelsPerUnit = 1024;
+    pack_options.texelsPerUnit = 500;
 
     /*
     if (!Pack(merged_mesh, pack_options)) {
@@ -310,7 +310,7 @@ void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart
     */
 
     std::vector<Mesh> atlas_meshes;
-    if (!Pack(merged_mesh, pack_options, atlas_meshes)) {
+    if (!Pack(chart_meshes, pack_options, atlas_meshes)) {
         spdlog::error("failed to pack uv chart");
         return;
     } else {
@@ -322,6 +322,7 @@ void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart
         const auto atlas_mesh_file_path = fmt::format("data/result/atlas_{0}.obj", i);
 
         OpenMesh::IO::write_mesh(atlas_mesh, atlas_mesh_file_path, option);
+        spdlog::info("succeed to write atlas mesh: {0}", atlas_mesh_file_path);
     }
 }
 
