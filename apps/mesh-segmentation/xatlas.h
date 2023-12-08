@@ -34,7 +34,23 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "common.h"
+#include <glm/glm.hpp>
+
 namespace xatlas {
+
+struct MeshInfo {
+    const Mesh& mesh;
+    glm::vec3 center_pos;
+    float chart_perimeter = 0.0f;
+};
+
+struct ChartInfo {
+    int chart_id = 0;
+    float chart_perimeter = 0.0f;
+    float distant = 0.0f;
+    float cost = 0.0f;
+};
 
 enum class ChartType
 {
