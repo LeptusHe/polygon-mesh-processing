@@ -277,13 +277,13 @@ float IterativeCluster::CalculateCost(const Mesh::Normal& chartNormal, Bounds uv
         const auto old_bounds_area = uvBounds.area();
         for (const auto v : m_mesh.fv_range(newFace)) {
             auto p = m_mesh.point(v);
-            uvBounds.Encapsulate(Eigen::Vector2f(p[0], p[2]));
+            uvBounds.Encapsulate(glm::vec2(p[0], p[2]));
         }
         const auto new_bounds_area = uvBounds.area();
-        const auto max_area = m_options.maxUVSize.x() * m_options.maxUVSize.y();
+        const auto max_area = m_options.maxUVSize.x * m_options.maxUVSize.y;
 
         const auto size = uvBounds.size();
-        if (size.x() > m_options.maxUVSize.x() || size.y() > m_options.maxUVSize.y()) {
+        if (size.x > m_options.maxUVSize.x || size.y > m_options.maxUVSize.y) {
 #if ENABLE_LOG
             //std::cout << "selected triangle exceeds the maximum uv size" << std::endl;
 #endif
@@ -421,10 +421,10 @@ Bounds IterativeCluster::CalculateUVBoundsForFace(const Mesh::FaceHandle& faceHa
     auto vhIter = m_mesh.fv_iter(faceHandle);
     auto p = m_mesh.point(*vhIter);
 
-    Bounds bounds(Eigen::Vector2f(p[0], p[2]));
+    Bounds bounds(glm::vec2(p[0], p[2]));
     for (const auto& vh : m_mesh.fv_range(faceHandle)) {
         p = m_mesh.point(vh);
-        bounds.Encapsulate(Eigen::Vector2f(p[0], p[2]));
+        bounds.Encapsulate(glm::vec2(p[0], p[2]));
     }
     return bounds;
 }
@@ -433,7 +433,7 @@ Bounds IterativeCluster::EncapsulateMeshFace(Bounds& bounds, const Mesh::FaceHan
 {
     for (const auto vh : m_mesh.fv_range(face_handle)) {
         auto p = m_mesh.point(static_cast<Mesh::VertexHandle>(vh));
-        bounds.Encapsulate(Eigen::Vector2f(p[0], p[2]));
+        bounds.Encapsulate(glm::vec2(p[0], p[2]));
     }
     return bounds;
 }
@@ -457,12 +457,12 @@ std::vector<Mesh> IterativeCluster::Unwrap()
         for (const auto vh : chart_mesh.vertices()) {
             const auto p = chart_mesh.point(vh);
 
-            Eigen::Vector2f uv(p[0], p[2]);
+            glm::vec2 uv(p[0], p[2]);
             uv = uv - chart_uv_bounds.min;
-            uv.x() = uv.x() / uv_size.x();
-            uv.y() = uv.y() / uv_size.y();
+            uv.x = uv.x / uv_size.x;
+            uv.y = uv.y / uv_size.y;
 
-            Mesh::TexCoord2D coord(2 * chart_idx + uv.x(), uv.y());
+            Mesh::TexCoord2D coord(2 * chart_idx + uv.x, uv.y);
             chart_mesh.set_texcoord2D(vh, coord);
         }
         chart_meshes.emplace_back(chart_mesh);

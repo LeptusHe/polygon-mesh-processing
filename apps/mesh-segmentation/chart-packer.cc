@@ -49,11 +49,11 @@ bool SetTextureCoordinate(const xatlas::Atlas *atlas, int mesh_index, Mesh& dst_
         return false;
 
     const auto mesh = atlas->meshes[mesh_index];
-    Bounds bounds(Eigen::Vector2f(mesh.vertexArray[0].uv[0], mesh.vertexArray[0].uv[1]));
+    Bounds bounds(glm::vec2(mesh.vertexArray[0].uv[0], mesh.vertexArray[0].uv[1]));
     for (int i = 0; i < mesh.vertexCount; ++ i) {
         const auto vert = mesh.vertexArray[i];
 
-        auto uv = Eigen::Vector2f(vert.uv[0], vert.uv[1]);
+        auto uv = glm::vec2(vert.uv[0], vert.uv[1]);
         bounds.Encapsulate(uv);
     }
 
@@ -64,7 +64,7 @@ bool SetTextureCoordinate(const xatlas::Atlas *atlas, int mesh_index, Mesh& dst_
         const auto vert_idx = vert.xref;
         Mesh::VertexHandle vh(static_cast<int>(vert_idx));
 
-        Mesh::TexCoord2D uv(vert.uv[0] / uv_bounds_size.x(), vert.uv[1] / uv_bounds_size.y());
+        Mesh::TexCoord2D uv(vert.uv[0] / uv_bounds_size.x, vert.uv[1] / uv_bounds_size.y);
         dst_mesh.set_texcoord2D(vh, uv);
     }
 
@@ -116,7 +116,7 @@ Bounds* CalculateUVBounds(const Mesh& mesh)
     for (const Mesh::VertexHandle vh : mesh.vertices()) {
         const auto tex_coord = mesh.texcoord2D(vh);
 
-        const auto uv = Eigen::Vector2f(tex_coord[0], tex_coord[1]);
+        const auto uv = glm::vec2(tex_coord[0], tex_coord[1]);
         if (uv_bounds == nullptr) {
             uv_bounds = new Bounds(uv);
         }
@@ -161,8 +161,8 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const std::funct
         for (const Mesh::VertexHandle vh : atlas_mesh.vertices()) {
             auto uv = atlas_mesh.texcoord2D(vh);
 
-            uv[0] = uv[0] / uv_size.x();
-            uv[1] = uv[1] / uv_size.y();
+            uv[0] = uv[0] / uv_size.x;
+            uv[1] = uv[1] / uv_size.y;
 
             atlas_mesh.set_texcoord2D(vh, uv);
         }

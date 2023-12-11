@@ -10,7 +10,7 @@ public:
         float maxChartArea = 0.0f;
         float normalWeight = 1.05f;
         bool enableUVbounds = false;
-        Eigen::Vector2f maxUVSize;
+        glm::vec2 maxUVSize;
     };
 
 private:

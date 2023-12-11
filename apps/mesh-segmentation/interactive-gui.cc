@@ -112,9 +112,9 @@ int interactive(int argc, char *argv[])
     options.normalWeight = options_data["normal-weight"].get<float>();
     options.enableUVbounds = options_data["enable-uv-bounds"].get<bool>();
 
-    auto max_uv_size = Eigen::Vector2f(8.0f, 8.0f);
-    max_uv_size.x() = options_data["max-uv-size-x"].get<float>();
-    max_uv_size.y() = options_data["max-uv-size-y"].get<float>();
+    auto max_uv_size = glm::vec2(8.0f, 8.0f);
+    max_uv_size.x = options_data["max-uv-size-x"].get<float>();
+    max_uv_size.y = options_data["max-uv-size-y"].get<float>();
     options.maxUVSize = max_uv_size;
 
     cluster.Init(options);
@@ -229,7 +229,7 @@ int interactive(int argc, char *argv[])
                 const auto& uv_bounds = cluster.GetChartUVBounds();
                 for (const auto& uv_bound : uv_bounds) {
                     const auto size = uv_bound.size();
-                    spdlog::info("uv bounds - [{}, {}]", size.x(), size.y());
+                    spdlog::info("uv bounds - [{}, {}]", size.x, size.y);
                 }
 
                 const auto chart_meshes = cluster.Unwrap();
