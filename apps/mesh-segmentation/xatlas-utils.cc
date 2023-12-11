@@ -24,7 +24,13 @@ std::vector<ChartInfo> CalculatePriority(const MeshInfo& primary_mesh, const std
     }
 
     std::sort(std::begin(chart_infos), std::end(chart_infos), [](const ChartInfo& lhs, const ChartInfo& rhs) {
-        return lhs.cost - rhs.cost;
+        if (lhs.cost != rhs.cost)
+            return lhs.cost < rhs.cost;
+
+        if (lhs.chart_perimeter != rhs.chart_perimeter)
+            return lhs.chart_perimeter > rhs.chart_perimeter;
+
+        return lhs.chart_id > rhs.chart_id;
     });
     return chart_infos;
 }
@@ -47,7 +53,10 @@ auto SortChartMesh(const std::vector<float>& scores) -> std::vector<std::pair<in
 auto SortChartMeshByPerimeter(std::vector<ChartInfo>& chart_infos) -> std::vector<ChartInfo>
 {
     std::sort(std::begin(chart_infos), std::end(chart_infos), [](const ChartInfo& lhs, const ChartInfo& rhs) {
-        return lhs.chart_perimeter - rhs.chart_perimeter;
+        if (lhs.chart_perimeter != rhs.chart_perimeter)
+            return lhs.chart_perimeter > rhs.chart_perimeter;
+
+        return lhs.chart_id > rhs.chart_id;
     });
     return chart_infos;
 }
