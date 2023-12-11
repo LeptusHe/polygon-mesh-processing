@@ -17,15 +17,22 @@ std::vector<ChartInfo> CalculatePriority(const MeshInfo& primary_mesh, const std
     }
 
     for (auto& chart_info : chart_infos) {
-        const float perimeter_cost = perimeter_weight * chart_info.chart_perimeter;
-        const float dist_cost = distant_weight * chart_info.distant;
+        const float perimeter_factor = perimeter_weight * chart_info.chart_perimeter / primary_mesh.chart_perimeter;
+        const float perimeter_cost = perimeter_weight * perimeter_factor;
+
+        const float dist_factor = glm::clamp(1 - chart_info.distant / max_dist, 0.0f, 1.0f);
+        const float dist_cost = distant_weight * dist_factor;
+
         const float cost = perimeter_cost + dist_cost;
         chart_info.cost = cost;
     }
 
     std::sort(std::begin(chart_infos), std::end(chart_infos), [](const ChartInfo& lhs, const ChartInfo& rhs) {
         if (lhs.cost != rhs.cost)
-            return lhs.cost < rhs.cost;
+            return lhs.cost > rhs.cost;
+
+        if (lhs.distant != rhs.distant)
+            return lhs.distant < rhs.distant;
 
         if (lhs.chart_perimeter != rhs.chart_perimeter)
             return lhs.chart_perimeter > rhs.chart_perimeter;
