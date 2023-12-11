@@ -44,7 +44,7 @@ auto SortChartMesh(const std::vector<float>& scores) -> std::vector<std::pair<in
     return mesh_score_pairs;
 }
 
-auto SortChartMeshByPerimeter(const std::vector<ChartInfo>& chart_infos) -> std::vector<ChartInfo>
+auto SortChartMeshByPerimeter(std::vector<ChartInfo>& chart_infos) -> std::vector<ChartInfo>
 {
     std::sort(std::begin(chart_infos), std::end(chart_infos), [](const ChartInfo& lhs, const ChartInfo& rhs) {
         return lhs.chart_perimeter - rhs.chart_perimeter;
