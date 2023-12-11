@@ -377,6 +377,17 @@ Mesh::FaceHandle IterativeCluster::FindCenterOfMesh(const Mesh& mesh)
     return lastFace;
 }
 
+std::vector<Mesh::Point> IterativeCluster::GetChartCenterPositions() const
+{
+    std::vector<Mesh::Point> positions;
+    for (const auto fh : m_seeds) {
+        const auto pos = m_mesh.calc_face_centroid(fh);
+        positions.push_back(pos);
+    }
+    return positions;
+}
+
+
 bool IterativeCluster::IsConverged() const
 {
     if (m_seeds.size() < m_options.minClusterCnt)

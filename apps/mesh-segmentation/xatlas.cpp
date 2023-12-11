@@ -8850,7 +8850,6 @@ struct Atlas
 
 	        uint32_t currentAtlas = 0;
 
-
 	        for (uint32_t i = 0; i < chart_infos.size(); ++ i) {
 	            const auto& chart_info = chart_infos[i];
 	            const auto& c = chart_info.chart_id;
@@ -8964,7 +8963,7 @@ struct Atlas
 			    // Update brute force start location.
 	            if (options.bruteForce) {
 	                if (best_x + best_cw > atlasSizes[currentAtlas].x || best_y + best_ch > atlasSizes[currentAtlas].y) {
-	                    for (uint32_t j = 0; j < chartStartPositions.size(); ++ i) {
+	                    for (uint32_t j = 0; j < chartStartPositions.size(); j ++) {
 	                        chartStartPositions[j] = Vector2i(0, 0);
 	                    }
 	                } else {
@@ -10178,7 +10177,7 @@ void ComputeCharts(Atlas *atlas, ChartOptions options)
 	XA_PRINT_MEM_USAGE
 }
 
-void PackCharts(Atlas *atlas, PackOptions packOptions)
+void PackCharts(Atlas *atlas, std::vector<MeshInfo>& mesh_infos, PackOptions packOptions)
 {
 	// Validate arguments and context state.
 	if (!atlas) {
@@ -10225,8 +10224,14 @@ void PackCharts(Atlas *atlas, PackOptions packOptions)
 		packAtlas.addCharts(ctx->taskScheduler, &ctx->paramAtlas);
 	XA_PROFILE_END(packChartsAddCharts)
 	XA_PROFILE_START(packCharts)
-	if (!packAtlas.packCharts(packOptions, ctx->progressFunc, ctx->progressUserData))
-		return;
+
+    if (mesh_infos.empty()) {
+        if (!packAtlas.packCharts(packOptions, ctx->progressFunc, ctx->progressUserData))
+            return;
+    } else {
+        if (!packAtlas.packChartsWithSpaceLocality(packOptions, mesh_infos, ctx->progressFunc, ctx->progressUserData))
+            return;
+    }
 	XA_PROFILE_END(packCharts)
 	// Populate atlas object with pack results.
 	atlas->atlasCount = packAtlas.getNumAtlases();
@@ -10511,7 +10516,9 @@ void Generate(Atlas *atlas, ChartOptions chartOptions, PackOptions packOptions)
 		return;
 	}
 	ComputeCharts(atlas, chartOptions);
-	PackCharts(atlas, packOptions);
+
+    std::vector<MeshInfo> mesh_infos;
+	PackCharts(atlas, mesh_infos, packOptions);
 }
 
 void SetProgressCallback(Atlas *atlas, ProgressFunc progressFunc, void *progressUserData)

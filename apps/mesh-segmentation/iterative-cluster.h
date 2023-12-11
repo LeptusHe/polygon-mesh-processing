@@ -26,7 +26,8 @@ public:
     void UpdateClusterCenters();
     Mesh GetClusterMesh(int clusterId);
     [[nodiscard]] bool IsConverged() const;
-    std::vector<Mesh::FaceHandle> GetChartCenters() { return m_seeds; }
+    [[nodiscard]] std::vector<Mesh::FaceHandle> GetChartCenters() const { return m_seeds; }
+    [[nodiscard]] std::vector<Mesh::Point> GetChartCenterPositions() const;
     Mesh::FaceHandle FindCenterOfMesh(const Mesh& mesh);
     void AddSeed(const Mesh::FaceHandle& fh);
     [[nodiscard]] size_t GetClusterCount() const { return m_seeds.size(); }

@@ -233,7 +233,7 @@ int interactive(int argc, char *argv[])
                 }
 
                 const auto chart_meshes = cluster.Unwrap();
-                WriteChartMesh("plane", chart_meshes);
+                WriteChartMesh(cluster, "plane", chart_meshes);
 
                 is_converged = true;
                 spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
@@ -272,7 +272,7 @@ int interactive(int argc, char *argv[])
 }
 
 
-void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart_meshes)
+void WriteChartMesh(const IterativeCluster& cluster, const std::string& file_name, const std::vector<Mesh>& chart_meshes)
 {
     const OpenMesh::IO::Options option = OpenMesh::IO::Options::VertexTexCoord;
 
@@ -310,7 +310,7 @@ void WriteChartMesh(const std::string& file_name, const std::vector<Mesh>& chart
     */
 
     std::vector<Mesh> atlas_meshes;
-    if (!Pack(chart_meshes, pack_options, atlas_meshes)) {
+    if (!Pack(cluster, chart_meshes, pack_options, atlas_meshes)) {
         spdlog::error("failed to pack uv chart");
         return;
     } else {

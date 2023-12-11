@@ -40,7 +40,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 namespace xatlas {
 
 struct MeshInfo {
-    const Mesh& mesh;
     glm::vec3 center_pos;
     float chart_perimeter = 0.0f;
 };
@@ -249,7 +248,7 @@ struct PackOptions
 };
 
 // Call after ComputeCharts. Can be called multiple times to re-pack charts with different options.
-void PackCharts(Atlas *atlas, PackOptions packOptions = PackOptions());
+void PackCharts(Atlas *atlas, std::vector<MeshInfo>& mesh_infos, PackOptions packOptions = PackOptions());
 
 // Equivalent to calling ComputeCharts and PackCharts in sequence. Can be called multiple times to regenerate with different options.
 void Generate(Atlas *atlas, ChartOptions chartOptions = ChartOptions(), PackOptions packOptions = PackOptions());
