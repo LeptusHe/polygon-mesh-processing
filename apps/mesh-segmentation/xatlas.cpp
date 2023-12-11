@@ -8854,6 +8854,7 @@ struct Atlas
 	            const auto& chart_info = chart_infos[i];
 	            const auto& c = chart_info.chart_id;
 
+	            /*
 #if XA_DEBUG
 	            bool firstChartInBitImage = false;
 #endif
@@ -8871,6 +8872,7 @@ struct Atlas
 					// Start positions are per-atlas, so create a new one of those too.
 	                chartStartPositions.push_back(Vector2i(0, 0));
 	            }
+	            */
 
 	            Chart *chart = m_charts[c];
 	            // @@ Add special cases for dot and line charts. @@ Lightmap rasterizer also needs to handle these special cases.
@@ -8947,17 +8949,55 @@ struct Atlas
 	            int best_cw = 0, best_ch = 0;
 	            int best_r = 0;
 
-				XA_PROFILE_START(packChartsFindLocation)
-	            const bool foundLocation = findChartLocation(options, chartStartPositions[currentAtlas], m_bitImages[currentAtlas], chartImageToPack, chartImageToPackRotated, atlasSizes[currentAtlas].x, atlasSizes[currentAtlas].y, &best_x, &best_y, &best_cw, &best_ch, &best_r, maxResolution);
-				XA_PROFILE_END(packChartsFindLocation)
+	            if (i == 0) {
+	                for (;;) {
+#if XA_DEBUG
+	                    bool firstChartInBitImage = false;
+#endif
+	                    if (currentAtlas + 1 > m_bitImages.size()) {
+	                        // Chart doesn't fit in the current bitImage, create a new one.
+	                        BitImage *bi = XA_NEW_ARGS(MemTag::Default, BitImage, resolution, resolution);
+	                        m_bitImages.push_back(bi);
+	                        atlasSizes.push_back(Vector2i(0, 0));
+#if XA_DEBUG
+	                        firstChartInBitImage = true;
+#endif
+	                        if (createImage)
+	                            m_atlasImages.push_back(XA_NEW_ARGS(MemTag::Default, AtlasImage, resolution, resolution));
+	                        // Start positions are per-atlas, so create a new one of those too.
+	                        chartStartPositions.push_back(Vector2i(0, 0));
+	                    }
 
-				XA_DEBUG_ASSERT(!(firstChartInBitImage && !foundLocation)); // Chart doesn't fit in an empty, newly allocated bitImage. Shouldn't happen, since charts are resized if they are too big to fit in the atlas.
+				        XA_PROFILE_START(packChartsFindLocation)
+				        const bool foundLocation = findChartLocation(options, chartStartPositions[currentAtlas], m_bitImages[currentAtlas], chartImageToPack, chartImageToPackRotated, atlasSizes[currentAtlas].x, atlasSizes[currentAtlas].y, &best_x, &best_y, &best_cw, &best_ch, &best_r, maxResolution);
+				        XA_PROFILE_END(packChartsFindLocation)
 
-	            if (foundLocation) {
-	                packed_chart_ids.push_back(chart_info.chart_id);
+				        XA_DEBUG_ASSERT(!(firstChartInBitImage && !foundLocation)); // Chart doesn't fit in an empty, newly allocated bitImage. Shouldn't happen, since charts are resized if they are too big to fit in the atlas.
+	                    if (maxResolution == 0) {
+	                        XA_DEBUG_ASSERT(foundLocation);
+	                        break;
+	                    }
+
+	                    if (foundLocation) {
+	                        packed_chart_ids.push_back(chart_info.chart_id);
+	                        break;
+	                    }
+
+	                    currentAtlas++;
+	                }
 	            } else {
-	                spdlog::error("failed to find location for chart: {}", chart_info.chart_id);
-	                continue;
+	                XA_PROFILE_START(packChartsFindLocation)
+                    const bool foundLocation = findChartLocation(options, chartStartPositions[currentAtlas], m_bitImages[currentAtlas], chartImageToPack, chartImageToPackRotated, atlasSizes[currentAtlas].x, atlasSizes[currentAtlas].y, &best_x, &best_y, &best_cw, &best_ch, &best_r, maxResolution);
+	                XA_PROFILE_END(packChartsFindLocation)
+
+                    //XA_DEBUG_ASSERT(!(firstChartInBitImage && !foundLocation)); // Chart doesn't fit in an empty, newly allocated bitImage. Shouldn't happen, since charts are resized if they are too big to fit in the atlas.
+
+	                if (foundLocation) {
+	                    packed_chart_ids.push_back(chart_info.chart_id);
+	                } else {
+	                    spdlog::error("failed to find location for chart: {}", chart_info.chart_id);
+	                    continue;
+	                }
 	            }
 
 			    // Update brute force start location.
