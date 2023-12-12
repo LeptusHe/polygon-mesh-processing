@@ -226,17 +226,16 @@ int interactive(int argc, char *argv[])
             v.data().set_colors(C);
         } else {
             if (!is_converged) {
-                const auto& uv_bounds = cluster.GetChartUVBounds();
-                for (const auto& uv_bound : uv_bounds) {
-                    const auto size = uv_bound.size();
-                    spdlog::info("uv bounds - [{}, {}]", size.x, size.y);
-                }
-
-                const auto chart_meshes = cluster.Unwrap();
-                WriteChartMesh(cluster, "plane", chart_meshes);
-
                 is_converged = true;
                 spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
+
+                ChartPacker::Options chart_options;
+                chart_options.enable_space_locality = true;
+                chart_options.xatlas_options.bruteForce = true;
+                chart_options.xatlas_options.resolution = 1024;
+                chart_options.xatlas_options.texelsPerUnit = 500;
+
+                GeneratePackedClusterMesh(cluster, chart_options, "plane");
             }
         }
         return false;
@@ -271,8 +270,20 @@ int interactive(int argc, char *argv[])
     return 0;
 }
 
+void GeneratePackedClusterMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options,  const std::string& file_name)
+{
+    const auto& uv_bounds = cluster.GetChartUVBounds();
+    for (const auto& uv_bound : uv_bounds) {
+        const auto size = uv_bound.size();
+        spdlog::info("uv bounds - [{}, {}]", size.x, size.y);
+    }
 
-void WriteChartMesh(const IterativeCluster& cluster, const std::string& file_name, const std::vector<Mesh>& chart_meshes)
+    const auto chart_meshes = cluster.Unwrap();
+    WriteChartMesh(cluster, pack_options, file_name, chart_meshes);
+}
+
+
+void WriteChartMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options, const std::string& file_name, const std::vector<Mesh>& chart_meshes)
 {
     const OpenMesh::IO::Options option = OpenMesh::IO::Options::VertexTexCoord;
 
@@ -292,10 +303,11 @@ void WriteChartMesh(const IterativeCluster& cluster, const std::string& file_nam
     const std::string mesh_file_path = fmt::format("data/result/{0}.obj", file_name);
     OpenMesh::IO::write_mesh(merged_mesh, mesh_file_path, option);
 
-    xatlas::PackOptions pack_options;
-    pack_options.bruteForce = true;
-    pack_options.resolution = 1024;
-    pack_options.texelsPerUnit = 500;
+    // TODO: // pack options
+    //xatlas::PackOptions pack_options;
+    //pack_options.bruteForce = true;
+    //pack_options.resolution = 1024;
+    //pack_options.texelsPerUnit = 500;
 
     /*
     if (!Pack(merged_mesh, pack_options)) {
@@ -309,17 +321,20 @@ void WriteChartMesh(const IterativeCluster& cluster, const std::string& file_nam
     OpenMesh::IO::write_mesh(merged_mesh, uv_mesh_file_path, option);
     */
 
+    ChartPacker chart_packer;
+
     std::vector<Mesh> atlas_meshes;
-    if (!Pack(cluster, chart_meshes, pack_options, atlas_meshes)) {
+    if (!chart_packer.Pack(cluster, pack_options)) {
         spdlog::error("failed to pack uv chart");
         return;
     } else {
+        atlas_meshes = chart_packer.GetAtlasMeshes();
         spdlog::info("succeed to pack uv chart");
     }
 
     for (int i = 0; i < atlas_meshes.size(); ++ i) {
         const auto& atlas_mesh = atlas_meshes[i];
-        const auto atlas_mesh_file_path = fmt::format("data/result/atlas_{0}.obj", i);
+        const auto atlas_mesh_file_path = fmt::format("data/result/{0}_atlas_{1}.obj", file_name, i);
 
         OpenMesh::IO::write_mesh(atlas_mesh, atlas_mesh_file_path, option);
         spdlog::info("succeed to write atlas mesh: {0}", atlas_mesh_file_path);

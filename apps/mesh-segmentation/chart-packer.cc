@@ -173,7 +173,15 @@ std::vector<Mesh> GenerateAtlasMesh(const xatlas::Atlas *atlas, const std::funct
 }
 
 
-bool Pack(const Mesh& mesh, const xatlas::PackOptions& pack_options, std::vector<Mesh>& cluster_meshes)
+bool ChartPacker::Pack(const IterativeCluster& cluster, const Options& options)
+{
+    m_options = options;
+
+    const auto chart_meshes = cluster.Unwrap();
+    return Pack(cluster, chart_meshes);
+}
+
+bool ChartPacker::Pack(const Mesh& mesh)
 {
     const auto atlas = xatlas::Create();
 
@@ -187,10 +195,10 @@ bool Pack(const Mesh& mesh, const xatlas::PackOptions& pack_options, std::vector
 
     // TODO: add options
     std::vector<xatlas::MeshInfo> mesh_infos;
-    xatlas::PackCharts(atlas, mesh_infos, pack_options);
+    xatlas::PackCharts(atlas, mesh_infos, m_options.xatlas_options);
 
     //SetTextureCoordinate(atlas, 0, mesh);
-    cluster_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
+    m_atlas_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
         return mesh;
     });
 
@@ -200,7 +208,7 @@ bool Pack(const Mesh& mesh, const xatlas::PackOptions& pack_options, std::vector
     return true;
 }
 
-bool Pack(const IterativeCluster& cluster, const std::vector<Mesh>& chart_meshes, const xatlas::PackOptions& pack_options, std::vector<Mesh>& cluster_meshes)
+bool ChartPacker::Pack(const IterativeCluster& cluster, const std::vector<Mesh>& chart_meshes)
 {
     const auto atlas = xatlas::Create();
 
@@ -216,17 +224,19 @@ bool Pack(const IterativeCluster& cluster, const std::vector<Mesh>& chart_meshes
 
     const auto chart_center_positions = cluster.GetChartCenterPositions();
     std::vector<xatlas::MeshInfo> mesh_infos;
-    for (int i = 0 ; i < chart_meshes.size(); ++ i) {
-        const auto chart_center_pos = chart_center_positions[i];
-        const auto pos = glm::vec3(chart_center_pos[0], chart_center_pos[1], chart_center_pos[2]);
 
-        xatlas::MeshInfo mesh_info{pos, 0.0f};
-        mesh_infos.push_back(mesh_info);
+    if (m_options.enable_space_locality) {
+        for (int i = 0 ; i < chart_meshes.size(); ++ i) {
+            const auto chart_center_pos = chart_center_positions[i];
+            const auto pos = glm::vec3(chart_center_pos[0], chart_center_pos[1], chart_center_pos[2]);
+
+            xatlas::MeshInfo mesh_info{pos, 0.0f};
+            mesh_infos.push_back(mesh_info);
+        }
     }
 
-    xatlas::PackCharts(atlas, mesh_infos, pack_options);
-
-    cluster_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
+    xatlas::PackCharts(atlas, mesh_infos, m_options.xatlas_options);
+    m_atlas_meshes = GenerateAtlasMesh(atlas, [&](int mesh_index) -> const Mesh& {
         return chart_meshes[mesh_index];
     });
 

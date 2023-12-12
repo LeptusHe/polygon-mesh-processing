@@ -24,7 +24,7 @@ public:
     void InitSeed();
     void ClearClusterProp();
     void UpdateClusterCenters();
-    Mesh GetClusterMesh(int clusterId);
+    [[nodiscard]] Mesh GetClusterMesh(int clusterId) const;
     [[nodiscard]] bool IsConverged() const;
     [[nodiscard]] std::vector<Mesh::FaceHandle> GetChartCenters() const { return m_seeds; }
     [[nodiscard]] std::vector<Mesh::Point> GetChartCenterPositions() const;
@@ -35,7 +35,7 @@ public:
 
     bool Init(const Options& options);
     bool UpdateCluster();
-    std::vector<Mesh> Unwrap();
+    [[nodiscard]] std::vector<Mesh> Unwrap() const;
 
 private:
     [[nodiscard]] Bounds CalculateUVBoundsForFace(const Mesh::FaceHandle& faceHandle) const;

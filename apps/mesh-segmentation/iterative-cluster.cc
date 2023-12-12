@@ -304,7 +304,7 @@ void IterativeCluster::ClearClusterProp()
     }
 }
 
-Mesh IterativeCluster::GetClusterMesh(int clusterId)
+Mesh IterativeCluster::GetClusterMesh(int clusterId) const
 {
     Mesh mesh = m_mesh;
 
@@ -438,7 +438,7 @@ Bounds IterativeCluster::EncapsulateMeshFace(Bounds& bounds, const Mesh::FaceHan
     return bounds;
 }
 
-std::vector<Mesh> IterativeCluster::Unwrap()
+std::vector<Mesh> IterativeCluster::Unwrap() const
 {
     if (!m_options.enableUVbounds) {
         spdlog::error("failed to unwrap uv because uv bounds not enabled");
