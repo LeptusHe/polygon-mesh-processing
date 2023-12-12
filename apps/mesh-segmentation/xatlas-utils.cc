@@ -17,7 +17,7 @@ std::vector<ChartInfo> CalculatePriority(const MeshInfo& primary_mesh, const std
     }
 
     for (auto& chart_info : chart_infos) {
-        const float perimeter_factor = perimeter_weight * chart_info.chart_perimeter / primary_mesh.chart_perimeter;
+        const float perimeter_factor = chart_info.chart_perimeter / primary_mesh.chart_perimeter;
         const float perimeter_cost = perimeter_weight * perimeter_factor;
 
         const float dist_factor = glm::clamp(1 - chart_info.distant / max_dist, 0.0f, 1.0f);
