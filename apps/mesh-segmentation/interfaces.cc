@@ -92,7 +92,7 @@ int MeshSegmentation(SegmentationOptions options, const float vertices[], int nu
 }
 
 
-MeshUnwrapper* InitInputMesh(const float vertices[], int numVertices, const int indices[], int triangleNum)
+MeshUnwrapper* InitInputMesh(const float *vertices, int numVertices, const int *indices, int triangleNum)
 {
     assert(vertices != nullptr && indices != nullptr);
 
@@ -153,6 +153,10 @@ bool Unwrap(MeshUnwrapper *unwrapper, SegmentationOptions seg_options, PackOptio
     if (unwrapper->input_mesh == nullptr)
         return false;
 
+    if (pack_options.texel_per_unit == 0) {
+        return false;
+    }
+
     auto cluster_opt = InitOptions(seg_options);
     cluster_opt.maxChartArea = 0.0f;
     cluster_opt.enableUVbounds = true;
@@ -190,8 +194,8 @@ int GetAtlasMeshCount(const MeshUnwrapper *unwrapper)
     if (unwrapper == nullptr || unwrapper->chart_packer == nullptr)
         return 0;
 
-    const auto& cluster_meshes = unwrapper->chart_packer->GetAtlasMeshes();
-    return static_cast<int>(cluster_meshes.size());
+    const auto& atlas_meshes = unwrapper->chart_packer->GetAtlasMeshes();
+    return static_cast<int>(atlas_meshes.size());
 }
 
 

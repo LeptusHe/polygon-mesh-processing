@@ -29,7 +29,7 @@
     #endif
 #endif
 
-//extern "C" {
+extern "C" {
 
 struct MeshUnwrapper {
     Mesh *input_mesh = nullptr;
@@ -54,14 +54,12 @@ struct PackOptions {
 
 MESHLIB_API int MeshSegmentation(SegmentationOptions options, const float vertices[], int numVertices, const int indices[], int triangleNum, int clusterIds[]);
 
-MESHLIB_API MeshUnwrapper* InitInputMesh(const float vertices[], int numVertices, const int indices[], int triangleNum);
+MESHLIB_API MeshUnwrapper* InitInputMesh(const float *vertices, int numVertices, const int *indices, int triangleNum);
 MESHLIB_API bool Unwrap(MeshUnwrapper *unwrapper, SegmentationOptions seg_options, PackOptions pack_options);
 MESHLIB_API int GetAtlasMeshCount(const MeshUnwrapper *unwrapper);
 MESHLIB_API bool GetAtlasMeshInfo(const MeshUnwrapper *unwrapper, int mesh_index, int& mesh_vert, int& num_triangle);
 MESHLIB_API bool GetAtlasMeshData(const MeshUnwrapper *unwrapper, int mesh_index, float *positions, float *uvs, int num_vert, int *indices, int num_triangle);
 MESHLIB_API void DestroyUnwrapper(const MeshUnwrapper *unwapper);
 
-
-
-//} // namespace
+} // namespace
 
