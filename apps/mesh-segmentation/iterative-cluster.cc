@@ -4,7 +4,6 @@
 
 #include <spdlog/spdlog.h>
 
-#define ENABLE_LOG 1
 
 struct Item {
     float cost;
@@ -32,7 +31,9 @@ using PriorityQueue = std::priority_queue<Item, std::vector<Item>, ItemComp>;
 
 
 IterativeCluster::IterativeCluster(Mesh& mesh, OpenMesh::FProp<int>& clusterProp)
-    : m_mesh(mesh), m_clusterProp(clusterProp)
+    : m_mesh(mesh)
+    , m_options()
+    , m_clusterProp(clusterProp)
 {
 }
 
@@ -46,7 +47,7 @@ void IterativeCluster::Run(const Options& options)
             break;
     }
 
-#if ENABLE_LOG
+#if ENABLE_DEBUG_VERBOSE
     if (m_restIterCnt == 0) {
         spdlog::info("IterativeCluster: reach max iteration count: {}", m_options.maxIterationNum);
     } else {
@@ -101,7 +102,7 @@ bool IterativeCluster::UpdateCluster()
 
     m_restIterCnt -= 1;
 
-#if ENABLE_LOG
+#if ENABLE_DEBUG_VERBOSE
     std::cout << "iteration: " << m_maxIterCnt - m_restIterCnt << "\n\n" << std::endl;
     std::cout << "iterative count: " << m_maxIterCnt - m_restIterCnt << std::endl;
     std::cout << "IterativeCluster: " << m_seeds.size() << " clusters" << std::endl;
@@ -175,7 +176,9 @@ Mesh::FaceHandle IterativeCluster::RegionGrowSync(std::vector<Mesh::FaceHandle>&
             continue;
 
         if (item.cost == std::numeric_limits<float>::max()) {
+#if ENABLE_DEBUG_VERBOSE
             spdlog::warn("skip invalid item");
+#endif
             continue;
         }
 
@@ -453,16 +456,20 @@ std::vector<Mesh> IterativeCluster::Unwrap() const
         chart_mesh.request_vertex_texcoords2D();
 
         const auto& chart_uv_bounds = m_chartUVBounds[chart_idx];
-        const auto& uv_size = chart_uv_bounds.size();
-        for (const auto vh : chart_mesh.vertices()) {
+        //const auto& uv_size = chart_uv_bounds.size();
+        const auto& max_uv_size = m_options.maxUVSize;
+        for (const Mesh::VertexHandle vh : chart_mesh.vertices()) {
             const auto p = chart_mesh.point(vh);
 
             glm::vec2 uv(p[0], p[2]);
             uv = uv - chart_uv_bounds.min;
-            uv.x = uv.x / uv_size.x;
-            uv.y = uv.y / uv_size.y;
+            uv.x = uv.x / max_uv_size.x;
+            uv.y = uv.y / max_uv_size.y;
 
-            Mesh::TexCoord2D coord(2 * chart_idx + uv.x, uv.y);
+            Mesh::TexCoord2D coord(2.0f * static_cast<float>(chart_idx) + uv.x, uv.y);
+            coord[0] *= max_uv_size.x;
+            coord[1] *= max_uv_size.y;
+
             chart_mesh.set_texcoord2D(vh, coord);
         }
         chart_meshes.emplace_back(chart_mesh);

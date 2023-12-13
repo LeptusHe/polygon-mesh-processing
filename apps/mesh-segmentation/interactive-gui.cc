@@ -105,6 +105,12 @@ int interactive(int argc, char *argv[])
 
     auto options_data = json_data["segmentation-options"];
 
+    ChartPacker::Options chart_options;
+    chart_options.enable_space_locality = true;
+    chart_options.xatlas_options.bruteForce = true;
+    chart_options.xatlas_options.resolution = 2048;
+    chart_options.xatlas_options.texelsPerUnit = 64;
+
     IterativeCluster::Options options;
     options.maxChartArea = options_data["max-chart-area"].get<float>();
     options.minClusterCnt = options.maxChartArea > 0 ? static_cast<int>(std::ceil(area / options.maxChartArea)) : 1;
@@ -116,6 +122,10 @@ int interactive(int argc, char *argv[])
     max_uv_size.x = options_data["max-uv-size-x"].get<float>();
     max_uv_size.y = options_data["max-uv-size-y"].get<float>();
     options.maxUVSize = max_uv_size;
+
+    options.maxUVSize.x = std::floor(static_cast<float>(chart_options.xatlas_options.resolution) / chart_options.xatlas_options.texelsPerUnit);
+    options.maxUVSize.y = std::floor(static_cast<float>(chart_options.xatlas_options.resolution) / chart_options.xatlas_options.texelsPerUnit);
+    spdlog::info("max uv size: [{0}, {1}]", options.maxUVSize.x, options.maxUVSize.y);
 
     cluster.Init(options);
 
@@ -229,11 +239,7 @@ int interactive(int argc, char *argv[])
                 is_converged = true;
                 spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
 
-                ChartPacker::Options chart_options;
-                chart_options.enable_space_locality = true;
-                chart_options.xatlas_options.bruteForce = true;
-                chart_options.xatlas_options.resolution = 1024;
-                chart_options.xatlas_options.texelsPerUnit = 500;
+
 
                 GeneratePackedClusterMesh(cluster, chart_options, "plane");
             }
