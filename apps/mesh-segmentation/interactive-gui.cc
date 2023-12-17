@@ -38,6 +38,32 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     std::cout << fmt::format("total area: {}\n", area);
 }
 
+void VisualizeMesh(const Mesh& mesh, Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::MatrixXd& C)
+{
+    V = Eigen::MatrixXd::Zero(static_cast<int>(mesh.n_vertices()), 3);
+    F = Eigen::MatrixXi::Zero(static_cast<int>(mesh.n_faces()), 3);
+    C = Eigen::MatrixXd::Zero(static_cast<int>(mesh.n_faces()), 3);
+
+    for (auto vertHandle : mesh.vertices()) {
+        auto vert = mesh.point(vertHandle);
+        V.row(vertHandle.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+    }
+
+    float area = 0.0f;
+    for (auto faceHandle : mesh.faces()) {
+        area += mesh.calc_face_area(faceHandle);
+
+        auto fvIter = mesh.cfv_iter(faceHandle);
+        for (int i = 0; i < 3; ++ i) {
+            F(faceHandle.idx(), i) = fvIter->idx();
+            ++ fvIter;
+        }
+        const auto& color = mesh.color(faceHandle);
+        const auto mesh_color = Eigen::Vector3d(color[0] / 255.0f, color[1] / 255.0f, color[2] / 255.0f);
+        C.row(faceHandle.idx()) = mesh_color;
+    }
+}
+
 int interactive(int argc, char *argv[])
 {
     FileManager::AddSearchPath("./");
@@ -108,8 +134,8 @@ int interactive(int argc, char *argv[])
     ChartPacker::Options chart_options;
     chart_options.enable_space_locality = true;
     chart_options.xatlas_options.bruteForce = true;
-    chart_options.xatlas_options.resolution = 2048;
-    chart_options.xatlas_options.texelsPerUnit = 64;
+    chart_options.xatlas_options.resolution = 1024;
+    chart_options.xatlas_options.texelsPerUnit = 32;
 
     IterativeCluster::Options options;
     options.maxChartArea = options_data["max-chart-area"].get<float>();
@@ -239,9 +265,29 @@ int interactive(int argc, char *argv[])
                 is_converged = true;
                 spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
 
+                auto atlas_meshes = GeneratePackedClusterMesh(cluster, chart_options, "plane");
+                Mesh merged_mesh;
+                merged_mesh.request_vertex_texcoords2D();
+                merged_mesh.request_face_colors();
 
+                ColorSetGenerator color_set_generator(atlas_meshes.size() + 10);
+                const auto& color_set = color_set_generator.GetColorSet();
 
-                GeneratePackedClusterMesh(cluster, chart_options, "plane");
+                for (int i = 0; i < atlas_meshes.size(); ++ i) {
+                    auto& mesh = atlas_meshes[i];
+                    mesh.request_face_colors();
+                    const auto& color = color_set[i];
+                    for (const auto fh : mesh.faces()) {
+                        auto mesh_color = Mesh::Color(color.x() * 255, color.y() * 255, color.z() * 255);
+                        mesh.set_color(fh, mesh_color);
+                    }
+                    merged_mesh = MergeMesh(merged_mesh, mesh);
+                }
+
+                VisualizeMesh(merged_mesh, V, F, C);
+                viewer.data().clear();
+                viewer.data().set_mesh(V, F);
+                viewer.data().set_colors(C);
             }
         }
         return false;
@@ -276,7 +322,7 @@ int interactive(int argc, char *argv[])
     return 0;
 }
 
-void GeneratePackedClusterMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options,  const std::string& file_name)
+std::vector<Mesh> GeneratePackedClusterMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options,  const std::string& file_name)
 {
     const auto& uv_bounds = cluster.GetChartUVBounds();
     for (const auto& uv_bound : uv_bounds) {
@@ -285,11 +331,11 @@ void GeneratePackedClusterMesh(const IterativeCluster& cluster, const ChartPacke
     }
 
     const auto chart_meshes = cluster.Unwrap();
-    WriteChartMesh(cluster, pack_options, file_name, chart_meshes);
+    return WriteChartMesh(cluster, pack_options, file_name, chart_meshes);
 }
 
 
-void WriteChartMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options, const std::string& file_name, const std::vector<Mesh>& chart_meshes)
+std::vector<Mesh> WriteChartMesh(const IterativeCluster& cluster, const ChartPacker::Options& pack_options, const std::string& file_name, const std::vector<Mesh>& chart_meshes)
 {
     const OpenMesh::IO::Options option = OpenMesh::IO::Options::VertexTexCoord;
 
@@ -332,7 +378,7 @@ void WriteChartMesh(const IterativeCluster& cluster, const ChartPacker::Options&
     std::vector<Mesh> atlas_meshes;
     if (!chart_packer.Pack(cluster, pack_options)) {
         spdlog::error("failed to pack uv chart");
-        return;
+        return {};
     } else {
         atlas_meshes = chart_packer.GetAtlasMeshes();
         spdlog::info("succeed to pack uv chart");
@@ -345,6 +391,7 @@ void WriteChartMesh(const IterativeCluster& cluster, const ChartPacker::Options&
         OpenMesh::IO::write_mesh(atlas_mesh, atlas_mesh_file_path, option);
         spdlog::info("succeed to write atlas mesh: {0}", atlas_mesh_file_path);
     }
+    return atlas_meshes;
 }
 
 Mesh MergeMesh(Mesh& merged_mesh, const Mesh& input_mesh)
@@ -368,7 +415,11 @@ Mesh MergeMesh(Mesh& merged_mesh, const Mesh& input_mesh)
             auto new_vh = merged_mesh.vertex_handle(new_vh_idx);
             face_handles.push_back(new_vh);
         }
-        merged_mesh.add_face(face_handles);
+        auto new_fh = merged_mesh.add_face(face_handles);
+
+        if (input_mesh.has_face_colors()) {
+            merged_mesh.set_color(new_fh, input_mesh.color(fh));
+        }
     }
     return merged_mesh;
 }
