@@ -38,6 +38,8 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     std::cout << fmt::format("total area: {}\n", area);
 }
 
+
+
 void VisualizeMesh(const Mesh& mesh, Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::MatrixXd& C)
 {
     V = Eigen::MatrixXd::Zero(static_cast<int>(mesh.n_vertices()), 3);
@@ -64,6 +66,19 @@ void VisualizeMesh(const Mesh& mesh, Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eig
     }
 }
 
+void VisualizeMesh(const Mesh& mesh, igl::opengl::glfw::Viewer& viewer)
+{
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    Eigen::MatrixXd C;
+
+    VisualizeMesh(mesh, V, F, C);
+
+    viewer.data().clear();
+    viewer.data().set_mesh(V, F);
+    viewer.data().set_colors(C);
+}
+
 int interactive(int argc, char *argv[])
 {
     FileManager::AddSearchPath("./");
@@ -83,6 +98,8 @@ int interactive(int argc, char *argv[])
     if (path.empty()) {
         spdlog::error("failed to find input mesh file: {0}", file_name);
         return -1;
+    } else {
+        spdlog::info("succeed to find input mesh file, file name: {0}, file path: {1}", file_name, path);
     }
 
     Mesh mesh;
@@ -135,7 +152,7 @@ int interactive(int argc, char *argv[])
     chart_options.enable_space_locality = true;
     chart_options.xatlas_options.bruteForce = true;
     chart_options.xatlas_options.resolution = 1024;
-    chart_options.xatlas_options.texelsPerUnit = 32;
+    chart_options.xatlas_options.texelsPerUnit = 128;
 
     IterativeCluster::Options options;
     options.maxChartArea = options_data["max-chart-area"].get<float>();
@@ -152,6 +169,8 @@ int interactive(int argc, char *argv[])
     options.maxUVSize.x = std::floor(static_cast<float>(chart_options.xatlas_options.resolution) / chart_options.xatlas_options.texelsPerUnit);
     options.maxUVSize.y = std::floor(static_cast<float>(chart_options.xatlas_options.resolution) / chart_options.xatlas_options.texelsPerUnit);
     spdlog::info("max uv size: [{0}, {1}]", options.maxUVSize.x, options.maxUVSize.y);
+
+    chart_options.xatlas_options.texelsPerUnit = 64;
 
     cluster.Init(options);
 
@@ -193,6 +212,16 @@ int interactive(int argc, char *argv[])
 
 
     int clusterColorIndex = 0;
+
+    bool visualize_atlas_mesh = false;
+    int visualized_atlas_mesh_index = 0;
+    std::vector<Mesh> atlas_meshes;
+
+    bool visualize_merged_atlas_mesh = false;
+    Mesh merged_mesh;
+    Eigen::MatrixXd atlas_mesh_V, atlas_mesh_C;
+    Eigen::MatrixXi atlas_mesh_F;
+
     int maxIteration = options.maxIterationNum;
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
@@ -201,6 +230,27 @@ int interactive(int argc, char *argv[])
             options.maxIterationNum = maxIteration;
             cluster.Run(options);
             set_color_to_mesh();
+        }
+
+        if (ImGui::Checkbox("visualize merged atlas mesh", &visualize_merged_atlas_mesh)) {
+            if (visualize_merged_atlas_mesh) {
+                viewer.data().clear();
+                viewer.data().set_mesh(atlas_mesh_V, atlas_mesh_F);
+                viewer.data().set_colors(atlas_mesh_C);
+            } else {
+                viewer.data().clear();
+                viewer.data().set_mesh(V, F);
+                viewer.data().set_colors(C);
+            }
+        }
+
+        if (!atlas_meshes.empty()) {
+            ImGui::Checkbox("visualize atlas mesh", &visualize_atlas_mesh);
+            if (visualize_atlas_mesh) {
+                if (ImGui::SliderInt("atlas mesh index", &visualized_atlas_mesh_index, 0, static_cast<int>(atlas_meshes.size()) - 1)) {
+                    VisualizeMesh(atlas_meshes[visualized_atlas_mesh_index], viewer);
+                }
+            }
         }
 
         if (ImGui::Button("output chart area")) {
@@ -265,12 +315,15 @@ int interactive(int argc, char *argv[])
                 is_converged = true;
                 spdlog::info("succeed to converged, chart count: {}", cluster.GetClusterCount());
 
-                auto atlas_meshes = GeneratePackedClusterMesh(cluster, chart_options, "plane");
-                Mesh merged_mesh;
+                const std::string output_file_name = fs::path(path).stem().string() + "_out";
+
+                atlas_meshes = GeneratePackedClusterMesh(cluster, chart_options, output_file_name);
+                spdlog::info("atlas mesh count: {}", atlas_meshes.size());
+
                 merged_mesh.request_vertex_texcoords2D();
                 merged_mesh.request_face_colors();
 
-                ColorSetGenerator color_set_generator(atlas_meshes.size() + 10);
+                const ColorSetGenerator color_set_generator(atlas_meshes.size() + 10);
                 const auto& color_set = color_set_generator.GetColorSet();
 
                 for (int i = 0; i < atlas_meshes.size(); ++ i) {
@@ -284,10 +337,13 @@ int interactive(int argc, char *argv[])
                     merged_mesh = MergeMesh(merged_mesh, mesh);
                 }
 
-                VisualizeMesh(merged_mesh, V, F, C);
-                viewer.data().clear();
-                viewer.data().set_mesh(V, F);
-                viewer.data().set_colors(C);
+                VisualizeMesh(merged_mesh, atlas_mesh_V, atlas_mesh_F, atlas_mesh_C);
+
+                if (visualize_merged_atlas_mesh) {
+                    viewer.data().clear();
+                    viewer.data().set_mesh(V, F);
+                    viewer.data().set_colors(C);
+                }
             }
         }
         return false;
@@ -314,6 +370,7 @@ int interactive(int argc, char *argv[])
     }
 
     //viewer.data().show_custom_labels = true;
+    viewer.resize(1920 * 1.5, 1080 * 1.5);
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     viewer.data().shininess = 100.0f;
@@ -342,7 +399,7 @@ std::vector<Mesh> WriteChartMesh(const IterativeCluster& cluster, const ChartPac
     for (int i = 0; i < chart_meshes.size(); ++ i) {
         const auto& chart_mesh = chart_meshes[i];
         auto file_path = fmt::format("data/result/{0}_{1}.obj", file_name, i);
-        OpenMesh::IO::write_mesh(chart_mesh, file_path, option);
+        //OpenMesh::IO::write_mesh(chart_mesh, file_path, option);
     }
 
     Mesh merged_mesh;
