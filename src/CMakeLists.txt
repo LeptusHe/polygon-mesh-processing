@@ -15,6 +15,8 @@ add_library(meshlib STATIC
     utils/vertex_merger.h
     simplification/simplification.cc
     simplification/simplification.h
+    simplification/ModVertexColorQuadricT.cc
+    simplification/ModVertexColorQuadricT.h
     visualization/mesh_vis.cc
     repair/repair.cc
     filesys/filesys.cc
