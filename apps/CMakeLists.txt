@@ -100,6 +100,9 @@ define_app_target(segmentation mesh-segmentation)
 # remesh
 define_app_target(remesh remesh)
 
+# vertex baking
+define_app_target(least-squares-vertex-baking vertex-baking)
+
 message(STATUS "app targets: ${app_targets}")
 
 add_custom_target(build-all DEPENDS ${app_targets})
