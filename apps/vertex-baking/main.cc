@@ -6,6 +6,8 @@
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
+#include "vertex-baker.h"
+
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
 void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
