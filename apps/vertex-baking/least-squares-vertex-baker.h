@@ -19,6 +19,7 @@ private:
     void CalculateConstantVector();
     Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh);
     void SolveLinerEquation();
+    float ConvertToColorValue(float v);
 
 private:
     OpenMesh::VProp<float> v_prop_;

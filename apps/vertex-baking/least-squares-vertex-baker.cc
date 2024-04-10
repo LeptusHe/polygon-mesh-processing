@@ -127,15 +127,30 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
 
     A.setFromTriplets(triples.begin(), triples.end());
 
+    Eigen::VectorXf x[3];
     for (int channel_idx = 0; channel_idx < 3; ++ channel_idx) {
         Eigen::VectorXf b = Eigen::VectorXf::Zero(mesh_.n_vertices());
         for (const auto vh : mesh_.vertices()) {
             b[vh.idx()] = v_constant_prop_[vh][channel_idx];
         }
 
-        // TODO: solve
+        Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
+        solver.compute(A);
+        x[channel_idx] = solver.solve(b);
     }
 
+    for (const auto vh : mesh_.vertices()) {
+        float r = ConvertToColorValue(x[0][vh.idx()]);
+        float g = ConvertToColorValue(x[1][vh.idx()]);
+        float b = ConvertToColorValue(x[2][vh.idx()]);
+
+        mesh_.set_color(vh, Mesh::Color(r * 255.0f, g * 255.0f, b * 255.0f));
+    }
+}
+
+float LeastSquaresVertexBaker::ConvertToColorValue(float v)
+{
+    return v;
 }
 
 } // namespace meshlib
