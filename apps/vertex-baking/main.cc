@@ -1,12 +1,17 @@
 #include <iostream>
 #include <filesystem>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 #include <Eigen/Core>
 #include <igl/opengl/glfw/Viewer.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
-#include "vertex-baker.h"
+#include "texture/texture.h"
+#include "point-sampling-vertex-baker.h"
+#include "least-squares-vertex-baker.h"
+
+using namespace meshlib;
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
@@ -26,8 +31,19 @@ int main(int argc, char *argv[])
 {
     auto path = argc > 1 ? argv[1] : "data/quad.obj";
 
+    std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
+    path = "./data/baking/PGD_WildBossA.obj";
+
+    Texture tex;
+    if (!tex.Load(tex_file_path)) {
+        return -1;
+    }
+
     Mesh mesh;
-    OpenMesh::IO::Options opt;
+    mesh.request_vertex_texcoords2D();
+    mesh.request_vertex_colors();
+
+    OpenMesh::IO::Options opt = OpenMesh::IO::Options::VertexTexCoord;
     if (!OpenMesh::IO::read_mesh(mesh, path, opt)) {
         std::cerr << "failed to load mesh from " << path << std::endl;
         return 1;
@@ -36,9 +52,22 @@ int main(int argc, char *argv[])
         PrintMeshInfo(mesh);
     }
 
+    if (!mesh.has_vertex_texcoords2D()) {
+        spdlog::error("loaded mesh does not have tex coordinate");
+        return -1;
+    }
+
+    if (!mesh.has_vertex_colors()) {
+        spdlog::error("loaded mesh does not have vertex colors");
+        return -1;
+    }
+
     mesh.request_vertex_status();
     mesh.request_edge_status();
     mesh.request_face_status();
+
+    PointSamplingVertexBaker vertex_baker(mesh, tex);
+    vertex_baker.Solve();
 
     std::filesystem::create_directories("data/result/");
     try {
@@ -84,6 +113,9 @@ int main(int argc, char *argv[])
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
+
+    meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+
     viewer.launch();
 
     return 0;

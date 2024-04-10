@@ -21,7 +21,8 @@ add_library(meshlib STATIC
     visualization/mesh_vis.cc
     repair/repair.cc
     filesys/filesys.cc
-    geometry/barycentric-coord.h
+    geometry/barycentric-coord.cc
+    texture/texture.cc
     ../apps/mesh-segmentation/bounds.h)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")

@@ -22,7 +22,7 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 
         if (mesh.has_vertex_colors()) {
             auto color = mesh.color(vh);
-            C.row(vh.idx()) = Eigen::Vector3d(color[0], color[1], color[2]);
+            C.row(vh.idx()) = Eigen::Vector3d(color[0] / 255.0f, color[1] / 255.0f, color[2] / 255.0f);
         }
     }
 
