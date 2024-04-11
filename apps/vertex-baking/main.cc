@@ -1,9 +1,12 @@
 #include <iostream>
 #include <filesystem>
 #include <fmt/format.h>
+#include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <Eigen/Core>
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
+#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
@@ -12,6 +15,11 @@
 #include "least-squares-vertex-baker.h"
 
 using namespace meshlib;
+
+enum class BakingMethod {
+    PointSampling,
+    LeastSquares
+};
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
@@ -67,10 +75,7 @@ int main(int argc, char *argv[])
     mesh.request_edge_status();
     mesh.request_face_status();
 
-    //PointSamplingVertexBaker vertex_baker(mesh, tex);
-    //vertex_baker.Solve();
-
-    LeastSquaresVertexBaker vertex_baker(mesh, tex);
+    PointSamplingVertexBaker vertex_baker(mesh, tex);
     vertex_baker.Solve();
 
     std::filesystem::create_directories("data/result/");
@@ -115,9 +120,40 @@ int main(int argc, char *argv[])
 
 
     igl::opengl::glfw::Viewer viewer;
+    igl::opengl::glfw::imgui::ImGuiPlugin plugin;
+    igl::opengl::glfw::imgui::ImGuiMenu menu;
+    viewer.plugins.push_back(&plugin);
+    plugin.widgets.push_back(&menu);
+
+    int current_method = static_cast<int>(BakingMethod::PointSampling);
+    menu.callback_draw_viewer_menu = [&]() {
+        menu.draw_viewer_menu();
+
+        const char* items[] = {"Point Sampling", "Least Squares"};
+        if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items))) {
+            auto method = static_cast<BakingMethod>(current_method);
+            std::unique_ptr<VertexBaker> vertex_baker;
+            switch (method) {
+                case BakingMethod::PointSampling: {
+                    vertex_baker = std::make_unique<PointSamplingVertexBaker>(mesh, tex);
+                    break;
+                }
+                case BakingMethod::LeastSquares: {
+                    vertex_baker = std::make_unique<LeastSquaresVertexBaker>(mesh, tex);
+                    break;
+                }
+                default: {
+                    spdlog::error("invalid baking method");
+                }
+            }
+            vertex_baker->Solve();
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+        }
+    };
+
+
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
-
     meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
 
     viewer.launch();
