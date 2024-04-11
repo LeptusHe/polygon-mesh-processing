@@ -3,7 +3,6 @@ find_package(fmt CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(CGAL CONFIG REQUIRED)
-find_package(Stb REQUIRED)
 
 add_library(meshlib STATIC
     parameterization/mds.cc
@@ -32,13 +31,13 @@ target_include_directories(meshlib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${third_party_include_dirs}
     ${OPENMESH_INCLUDE_DIRS}
-    ${Stb_INCLUDE_DIRS}
 )
 
 target_link_libraries(meshlib PUBLIC
     ${OPENMESH_LIBRARIES}
     CGAL::CGAL
     igl::core
+    igl::png
     fmt::fmt
     Eigen3::Eigen
     spdlog::spdlog

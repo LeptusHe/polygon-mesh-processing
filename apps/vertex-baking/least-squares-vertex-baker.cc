@@ -2,6 +2,7 @@
 #include "sampling/uniform-sampler.h"
 #include "sampling/hammersley-sampler.h"
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 namespace meshlib {
 
@@ -92,7 +93,10 @@ void LeastSquaresVertexBaker::Solve()
 {
     CalculateCoefficientMatrix();
     CalculateConstantVector();
+
+    spdlog::stopwatch sw;
     SolveLinerEquation();
+    spdlog::info("succeed to solve equation, time={}s", sw);
 }
 
 
@@ -191,7 +195,8 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
     std::cout << mat.format(fmt) << std::endl;
 #endif
 
-    Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
+    Eigen::SimplicialLLT<Eigen::SparseMatrix<float>> solver;
+    //Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
     solver.compute(A);
 
     Eigen::VectorXf x[3];
@@ -245,6 +250,7 @@ float LeastSquaresVertexBaker::ConvertToColorValue(float v)
         spdlog::error("invalid color: {}", v);
     }
 
+    v = std::clamp(v, 0.0f, 1.0f);
     return v;
 }
 

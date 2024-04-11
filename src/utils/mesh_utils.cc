@@ -15,6 +15,7 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
     Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
     Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
     Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
+    Eigen::MatrixXd UV = Eigen::MatrixXd::Zero(mesh.n_vertices(), 2);
 
     for (auto vh : mesh.vertices()) {
         auto vert = mesh.point(vh);
@@ -23,6 +24,11 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
         if (mesh.has_vertex_colors()) {
             auto color = mesh.color(vh);
             C.row(vh.idx()) = Eigen::Vector3d(color[0] / 255.0f, color[1] / 255.0f, color[2] / 255.0f);
+        }
+
+        if (mesh.has_vertex_texcoords2D()) {
+            auto uv = mesh.texcoord2D(vh);
+            UV.row(vh.idx()) = Eigen::Vector2d(uv[0], uv[1]);
         }
     }
 
@@ -36,6 +42,10 @@ void MeshUtils::ConvertMeshToViewer(const Mesh& mesh, igl::opengl::glfw::Viewer&
 
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
+
+    if (mesh.has_vertex_texcoords2D()) {
+        viewer.data().set_uv(UV);
+    }
 
     if (mesh.has_vertex_colors()) {
         viewer.data().set_colors(C);

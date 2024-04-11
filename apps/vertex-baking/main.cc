@@ -7,6 +7,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
+#include <igl/png/readPNG.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
@@ -46,6 +47,11 @@ int main(int argc, char *argv[])
     Texture tex;
     if (!tex.Load(tex_file_path)) {
         return -1;
+    }
+
+    Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> R, G, B, A;
+    if (!igl::png::readPNG(tex_file_path, R, G, B, A)) {
+        spdlog::error("failed to read texture from path [{}]", tex_file_path);
     }
 
     Mesh mesh;
@@ -129,6 +135,8 @@ int main(int argc, char *argv[])
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
+        ImGui::Separator();
+
         const char* items[] = {"Point Sampling", "Least Squares"};
         if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items))) {
             auto method = static_cast<BakingMethod>(current_method);
@@ -148,13 +156,29 @@ int main(int argc, char *argv[])
             }
             vertex_baker->Solve();
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            viewer.data().set_texture(R, G, B, A);
         }
+
+        ImGui::Spacing();
+        if (ImGui::Button("show texture")) {
+            meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+            viewer.data().set_texture(R, G, B, A);
+
+            Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+            for (int i = 0; i < mesh.n_vertices(); ++ i) {
+                C.row(i) = Eigen::Vector3d(1.0f, 1.0f, 1.0f);
+            }
+            viewer.data().set_colors(C);
+            viewer.data().show_texture = true;
+        }
+        ImGui::Spacing();
     };
 
 
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
+    viewer.data().set_texture(R, G, B, A);
 
     viewer.launch();
 
