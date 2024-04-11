@@ -66,7 +66,10 @@ int main(int argc, char *argv[])
     mesh.request_edge_status();
     mesh.request_face_status();
 
-    PointSamplingVertexBaker vertex_baker(mesh, tex);
+    //PointSamplingVertexBaker vertex_baker(mesh, tex);
+    //vertex_baker.Solve();
+
+    LeastSquaresVertexBaker vertex_baker(mesh, tex);
     vertex_baker.Solve();
 
     std::filesystem::create_directories("data/result/");

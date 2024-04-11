@@ -1,5 +1,6 @@
 #include "least-squares-vertex-baker.h"
 #include "sampling/uniform-sampler.h"
+#include <spdlog/spdlog.h>
 
 namespace meshlib {
 
@@ -40,6 +41,7 @@ void LeastSquaresVertexBaker::Solve()
 {
     CalculateCoefficientMatrix();
     CalculateConstantVector();
+    SolveLinerEquation();
 }
 
 
@@ -59,6 +61,9 @@ void LeastSquaresVertexBaker::CalculateCoefficientMatrix()
                 continue;
 
             const auto fh = he.face();
+            if (!fh.is_valid())
+                continue;
+
             e_prop_[eh] += 1.0f / 12.0f * mesh_.calc_face_area(fh);
         }
     }
@@ -109,7 +114,7 @@ Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandl
 
 void LeastSquaresVertexBaker::SolveLinerEquation()
 {
-    Eigen::SparseMatrix<float> A;
+    Eigen::SparseMatrix<float> A(mesh_.n_vertices(), mesh_.n_vertices());
 
     std::vector<Eigen::Triplet<float>> triples;
     for (const auto vh : mesh_.vertices()) {
@@ -137,6 +142,13 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
         Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
         solver.compute(A);
         x[channel_idx] = solver.solve(b);
+
+        if (solver.info() != Eigen::Success) {
+            spdlog::error("failed to solve linear equation");
+        } else {
+            spdlog::info("succeed to solve linear equation");
+        }
+
     }
 
     for (const auto vh : mesh_.vertices()) {
