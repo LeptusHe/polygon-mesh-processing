@@ -160,7 +160,7 @@ Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandl
 
         // TODO: what is hat function?
         val += barycentric_coord.x * tex_.Sample(uv);
-        //val += barycentric_coord.z * Eigen::Vector3f(1, 1, 1); // tex_.Sample(uv);
+        //val += barycentric_coord.z * Eigen::Vector3f(1, 1, 1);
     }
     return val;
 }
@@ -185,9 +185,14 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
 
     A.setFromTriplets(triples.begin(), triples.end());
 
+#if DEBUG_MATRIX
     Eigen::IOFormat fmt(6, 0, ", ", "\n", "[", "]");
     Eigen::MatrixXf mat = Eigen::MatrixXf(A);
-    //std::cout << mat.format(fmt) << std::endl;
+    std::cout << mat.format(fmt) << std::endl;
+#endif
+
+    Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
+    solver.compute(A);
 
     Eigen::VectorXf x[3];
     for (int channel_idx = 0; channel_idx < 3; ++ channel_idx) {
@@ -203,10 +208,10 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
         b[3] = 1 / 6.0 * 2.0;
          */
 
-        //std::cout << b.format(fmt) << std::endl;
+#if DEBUG_MATRIX
+        std::cout << b.format(fmt) << std::endl;
+#endif
 
-        Eigen::SparseQR<Eigen::SparseMatrix<float>, Eigen::COLAMDOrdering<int>> solver;
-        solver.compute(A);
         x[channel_idx] = solver.solve(b);
 
         if (solver.info() != Eigen::Success) {
@@ -222,7 +227,10 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
         float g = ConvertToColorValue(x[1][vh.idx()]);
         float b = ConvertToColorValue(x[2][vh.idx()]);
 
+#if DEBUG_MATRIX
         spdlog::info("c {}, {}, {}\n", r, g, b);
+#endif
+
         mesh_.set_color(vh, Mesh::Color(r * 255.0f, g * 255.0f, b * 255.0f));
     }
 }

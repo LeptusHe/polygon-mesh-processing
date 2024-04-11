@@ -15,6 +15,7 @@ public:
 
 private:
     void Init();
+    void GenerateSamplingSamples();
     void CalculateCoefficientMatrix();
     void CalculateConstantVector();
     Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh);

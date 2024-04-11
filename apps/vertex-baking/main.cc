@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
 
     std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
     path = "./data/baking/PGD_WildBossA.obj";
+    path = "./data/baking/plane_test.obj";
 
     Texture tex;
     if (!tex.Load(tex_file_path)) {
