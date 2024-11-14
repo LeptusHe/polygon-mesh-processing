@@ -18,6 +18,7 @@ message(STATUS "include dirs of externals: ${third_party_include_dirs}")
 
 add_subdirectory(src)
 add_subdirectory(apps)
+add_subdirectory(tests)
 
 add_custom_target(clean-build
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}
