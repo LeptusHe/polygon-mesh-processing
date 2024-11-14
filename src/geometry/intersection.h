@@ -5,6 +5,6 @@
 
 namespace meshlib {
 
-float calc_2d_intersection_in_y_plane(const Line& line, const LineSegment& segment);
+float calc_2d_line_and_segment_intersection(const Line2D& line, const LineSegment2D& segment);
 
 } // namespace meshlib

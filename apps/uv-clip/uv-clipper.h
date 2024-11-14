@@ -2,29 +2,34 @@
 
 #include "utils/mesh_io.h"
 #include <glm/glm.hpp>
-#include "line.h"
+#include "geometry/line.h"
+#include "geometry/bounds.h"
 
 namespace meshlib {
 
 class UVClipper {
 public:
     void process(Mesh& mesh);
-    void process_triangle(Mesh& mesh, std::vector<Mesh::VertexHandle>& triangle);
-
-
-private:
-    glm::ivec2 calculate_uv_offset(const std::vector<Mesh::VertexHandle>& triangle);
-    std::vector<Mesh::VertexHandle> clip_polygon_by_uv_bounds(std::vector<Mesh::VertexHandle>& polygon);
-    std::vector<Mesh::VertexHandle> get_clipped_polygon_by_line(std::vector<Mesh::VertexHandle>& polygon);
-    bool is_inside(const Mesh::Point& p, const Line& line);
-    float calculate_intersection_point(const Mesh::Point& p0, const Mesh::Point& p1);
+    void process_triangle(const std::vector<Mesh::VertexHandle>& triangle);
 
 private:
-    Mesh::Point convert_to_point(const glm::vec3& p);
-    glm::vec3 convert_to(const Mesh::Point& p);
+    std::vector<Mesh::VertexHandle> clip_polygon_by_uv_bounds(const std::vector<Mesh::VertexHandle>& polygon,
+                                                              const Bounds2D& bounds);
+
+    std::vector<Mesh::VertexHandle> get_clipped_polygon_by_line(const std::vector<Mesh::VertexHandle>& polygon,
+                                                                const Line2D& line);
+
+    bool is_inside(const glm::vec2& uv, const Line2D& line);
+    float calculate_intersection_point(const glm::vec2& p0, const glm::vec2& p1, const Line2D& line);
+    Bounds<glm::vec2> calculate_uv_bounds(const std::vector<Mesh::VertexHandle>& triangle);
+    std::vector<Line2D> generate_bound_lines(const Bounds2D& bounds);
 
 private:
-    Mesh mesh;
+    Mesh::VertexHandle add_intersection_point(float t, const Mesh::VertexHandle& v0, const Mesh::VertexHandle& v1);
+    glm::vec2 get_uv(const Mesh::VertexHandle& vh);
+
+private:
+    Mesh m_mesh;
 };
 
 } // namespace meshlib

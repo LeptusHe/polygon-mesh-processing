@@ -5,24 +5,34 @@
 
 namespace meshlib {
 
+template <typename T>
 class Line {
 public:
-    Line(const glm::vec3& p0, const glm::vec3& p1) : p0(p0), p1(p1) {}
-    [[nodiscard]] glm::vec3 GetDir() const;
+    Line(const T& p0, const T& p1) : p0(p0), p1(p1) {}
+
+    [[nodiscard]] T GetDir() const
+    {
+        return p1 - p0;
+    }
 
 public:
-    glm::vec3 p0;
-    glm::vec3 p1;
+    T p0;
+    T p1;
 };
 
 
+template <typename T>
 class LineSegment {
 public:
-    LineSegment(const glm::vec3& start, const glm::vec3& end): start(start), end(end) {}
+    LineSegment(const T& start, const T& end): start(start), end(end) {}
 
 public:
-    glm::vec3 start;
-    glm::vec3 end;
+    T start;
+    T end;
 };
+
+
+using Line2D = Line<glm::vec2>;
+using LineSegment2D = LineSegment<glm::vec2>;
 
 } // namespace meshlib

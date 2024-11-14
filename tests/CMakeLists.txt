@@ -3,6 +3,7 @@ find_package(Catch2 CONFIG REQUIRED)
 
 add_executable(tests
     polygon-clip-test.cc
+    bounds-test.cc
 )
 
 
