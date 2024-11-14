@@ -21,6 +21,8 @@ add_library(meshlib STATIC
     repair/repair.cc
     filesys/filesys.cc
     geometry/barycentric-coord.cc
+    geometry/line.cc
+    geometry/intersection.cc
     texture/texture.cc
     ../apps/mesh-segmentation/bounds.h)
 

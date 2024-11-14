@@ -8,12 +8,14 @@ add_executable(tests
 
 target_include_directories(tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${third_party_include_dirs}
     ../src
 )
 
 
 target_link_libraries(tests PRIVATE
     Catch2::Catch2WithMain
+    meshlib
 )
 
 
