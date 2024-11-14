@@ -1,3 +1,4 @@
+#include <iostream>
 #include "uv-clipper.h"
 #include "geometry/intersection.h"
 
@@ -39,7 +40,8 @@ void UVClipper::process_triangle(const std::vector<Mesh::VertexHandle>& triangle
             glm::ivec2 sub_bounds_max{x + 1, y + 1};
 
             const auto sub_bounds = Bounds2D::FromMinAndMax(sub_bounds_min, sub_bounds_max);
-
+            const auto polygon = clip_polygon_by_uv_bounds(triangle, sub_bounds);
+            triangulate_polygon(polygon);
         }
     }
 }
@@ -173,6 +175,36 @@ Mesh::VertexHandle UVClipper::add_intersection_point(float t, const Mesh::Vertex
 
     // TODO: normal, tangent
     return vh;
+}
+
+void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polygon)
+{
+    if (polygon.size() == 0)
+        return;
+
+    if (polygon.size() < 3) {
+        std::cerr << "invalid vertex count of polygon is " << polygon.size() << std::endl;
+        return;
+    }
+
+    std::vector<Mesh::VertexHandle> new_polygon;
+    for (const auto vh: polygon) {
+        const auto new_vh = copy_vertex_to_clipped_mesh(vh);
+        new_polygon.push_back(new_vh);
+    }
+
+    const auto v0 = new_polygon[0];
+    for (int i = 2; i < new_polygon.size(); ++ i) {
+        const auto v1 = new_polygon[i - 1];
+        const auto v2 = new_polygon[i - 0];
+
+        std::vector<Mesh::VertexHandle> face {
+            v0,
+            v1,
+            v2
+        };
+        m_clipped_mesh.add_face(face);
+    }
 }
 
 } // namespace meshlib
