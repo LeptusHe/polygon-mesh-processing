@@ -1,10 +1,12 @@
 #include <iostream>
 #include <filesystem>
+#include <spdlog/spdlog.h>
 #include <fmt/format.h>
 #include <Eigen/Core>
 #include <igl/opengl/glfw/Viewer.h>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
+#include "pmp/clip/uv-clipper.h"
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
@@ -25,7 +27,10 @@ int main(int argc, char *argv[])
     auto path = argc > 1 ? argv[1] : "data/quad.obj";
 
     Mesh mesh;
+    mesh.request_vertex_texcoords2D();
+
     OpenMesh::IO::Options opt;
+    opt = opt | OpenMesh::IO::Options::VertexTexCoord;
     if (!OpenMesh::IO::read_mesh(mesh, path, opt)) {
         std::cerr << "failed to load mesh from " << path << std::endl;
         return 1;
@@ -38,23 +43,26 @@ int main(int argc, char *argv[])
     mesh.request_edge_status();
     mesh.request_face_status();
 
-    for (int vid = 0; vid < mesh.n_vertices() - 1; ++ vid) {
-        auto vertHandle = mesh.vertex_handle(vid);
-        //mesh.delete_vertex(vertHandle, false);
+    if (!mesh.has_vertex_texcoords2D()) {
+        spdlog::info("failed to load mesh with tex coord, exit!");
+        return -1;
     }
-    PrintMeshInfo(mesh, "after delete vertex");
 
-    for (int face = 0; face < mesh.n_faces() - 1; ++ face) {
-        auto faceHandle = mesh.face_handle(face);
-        //mesh.delete_face(faceHandle, false);
-    }
-    mesh.garbage_collection();
-    PrintMeshInfo(mesh, "after garbage collection");
+    meshlib::UVClipper clipper;
+    clipper.process(mesh);
 
-    std::filesystem::create_directories("data/result/");
+    const auto clipped_mesh = clipper.get_clipped_mesh();
+    PrintMeshInfo(clipped_mesh, "after clip");
+
+    const auto output_dir = "data/result/";
+    std::filesystem::create_directories(output_dir);
     try {
+        std::filesystem::path input_path(path);
+        const auto file_name = input_path.stem().string();
+        const auto output_path = output_dir + file_name + "_result.obj";
 
-        if (!OpenMesh::IO::write_mesh(mesh, "data/result/openmesh.obj")) {
+        OpenMesh::IO::Options write_opt = OpenMesh::IO::Options::VertexTexCoord;
+        if (!OpenMesh::IO::write_mesh(clipped_mesh, output_path, write_opt)) {
             std::cerr << fmt::format("failed to write mesh to [{0}]", path) << std::endl;
             return 1;
         } else {
@@ -65,14 +73,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
-    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(mesh.n_faces(), 3);
-    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(mesh.n_vertices(), 3);
+    const auto visualized_mesh = mesh;
+    Eigen::MatrixXd V = Eigen::MatrixXd::Zero(visualized_mesh.n_vertices(), 3);
+    Eigen::MatrixXi F = Eigen::MatrixXi::Zero(visualized_mesh.n_faces(), 3);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Zero(visualized_mesh.n_vertices(), 3);
 
-    for (auto vertHandle : mesh.vertices()) {
-        auto vert = mesh.point(vertHandle);
-        //std::cout << fmt::format("vert: [{0}, {1}, {2}]", vert[0], vert[1], vert[2]) << std::endl;
-        V.row(vertHandle.idx()) = Eigen::Vector3d(vert[0], vert[1], vert[2]);
+    for (auto vertHandle : visualized_mesh.vertices()) {
+        auto vert = visualized_mesh.point(vertHandle);
+        auto uv = visualized_mesh.texcoord2D(vertHandle);
+        V.row(vertHandle.idx()) = Eigen::Vector3d(uv[0], 0, uv[1]);
 
         if (!vertHandle.is_manifold()) {
             C.row(vertHandle.idx()) = Eigen::Vector3d(1, 0, 0);
@@ -82,15 +91,13 @@ int main(int argc, char *argv[])
     }
 
 
-    for (auto faceHandle : mesh.faces()) {
-        auto fvIter = mesh.cfv_iter(faceHandle);
+    for (auto faceHandle : visualized_mesh.faces()) {
+        auto fvIter = visualized_mesh.cfv_iter(faceHandle);
         for (int i = 0; i < 3; ++ i) {
             F(faceHandle.idx(), i) = fvIter->idx();
-            //std::cout << fmt::format("face: [{0}, {1}, {2}]", faceHandle.idx(), i, fvIter->idx()) << std::endl;
             ++ fvIter;
         }
     }
-
 
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(V, F);

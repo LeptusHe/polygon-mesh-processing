@@ -224,6 +224,10 @@ Mesh::VertexHandle UVClipper::copy_vertex_to_clipped_mesh(const Mesh::VertexHand
     auto v0 = m_clipped_mesh.add_vertex(p);
 
     auto uv = m_mesh.texcoord2D(vh);
+
+    uv[0] = uv[0] - std::floor(uv[0]);
+    uv[1] = uv[1] - std::floor(uv[1]);
+
     m_clipped_mesh.set_texcoord2D(v0, uv);
     return v0;
 }
