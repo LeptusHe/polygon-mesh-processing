@@ -11,8 +11,10 @@ class UVClipper {
 public:
     void process(Mesh& mesh);
     void process_triangle(const std::vector<Mesh::VertexHandle>& triangle);
+    const Mesh& get_clipped_mesh() const;
 
 private:
+    void init_mesh(Mesh& mesh);
     std::vector<Mesh::VertexHandle> clip_polygon_by_uv_bounds(const std::vector<Mesh::VertexHandle>& polygon,
                                                               const Bounds2D& bounds);
 
@@ -29,7 +31,6 @@ private:
     Mesh::VertexHandle add_intersection_point(float t, const Mesh::VertexHandle& v0, const Mesh::VertexHandle& v1);
     Mesh::VertexHandle copy_vertex_to_clipped_mesh(const Mesh::VertexHandle& vh);
     glm::vec2 get_uv(const Mesh::VertexHandle& vh);
-
 
 private:
     Mesh m_mesh;

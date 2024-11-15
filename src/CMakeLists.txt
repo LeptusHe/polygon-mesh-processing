@@ -23,6 +23,7 @@ add_library(meshlib STATIC
     geometry/barycentric-coord.cc
     geometry/intersection.cc
     texture/texture.cc
+    pmp/clip/uv-clipper.cc
     ../apps/mesh-segmentation/bounds.h)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")

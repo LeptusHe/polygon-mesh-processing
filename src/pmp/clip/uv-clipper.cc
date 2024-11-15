@@ -18,6 +18,8 @@ T Lerp(const T& a, const T& b, float t)
 
 void UVClipper::process(Mesh& mesh)
 {
+    init_mesh(mesh);
+
     for (const auto face : mesh.faces()) {
         std::vector<Mesh::VertexHandle> vh_list;
         for (const auto vh : mesh.fv_range(face)) {
@@ -25,6 +27,15 @@ void UVClipper::process(Mesh& mesh)
         }
 
         process_triangle(vh_list);
+    }
+}
+
+void UVClipper::init_mesh(Mesh& mesh)
+{
+    m_mesh = mesh;
+
+    if (mesh.has_vertex_texcoords2D()) {
+        m_clipped_mesh.request_vertex_texcoords2D();
     }
 }
 
@@ -93,8 +104,8 @@ std::vector<Mesh::VertexHandle> UVClipper::get_clipped_polygon_by_line(const std
                 result.push_back(intersection_vh);
             }
         }
-        return result;
     }
+    return result;
 }
 
 Bounds<glm::vec2> UVClipper::calculate_uv_bounds(const std::vector<Mesh::VertexHandle>& triangle)
@@ -205,6 +216,21 @@ void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polyg
         };
         m_clipped_mesh.add_face(face);
     }
+}
+
+Mesh::VertexHandle UVClipper::copy_vertex_to_clipped_mesh(const Mesh::VertexHandle& vh)
+{
+    auto p = m_mesh.point(vh);
+    auto v0 = m_clipped_mesh.add_vertex(p);
+
+    auto uv = m_mesh.texcoord2D(vh);
+    m_clipped_mesh.set_texcoord2D(v0, uv);
+    return v0;
+}
+
+const Mesh& UVClipper::get_clipped_mesh() const
+{
+    return m_clipped_mesh;
 }
 
 } // namespace meshlib
