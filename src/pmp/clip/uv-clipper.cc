@@ -20,9 +20,9 @@ void UVClipper::process(Mesh& mesh)
 {
     init_mesh(mesh);
 
-    for (const auto face : mesh.faces()) {
+    for (const auto face : m_mesh.faces()) {
         std::vector<Mesh::VertexHandle> vh_list;
-        for (const auto vh : mesh.fv_range(face)) {
+        for (const auto vh : m_mesh.fv_range(face)) {
             vh_list.push_back(vh);
         }
 
@@ -52,7 +52,7 @@ void UVClipper::process_triangle(const std::vector<Mesh::VertexHandle>& triangle
 
             const auto sub_bounds = Bounds2D::FromMinAndMax(sub_bounds_min, sub_bounds_max);
             const auto polygon = clip_polygon_by_uv_bounds(triangle, sub_bounds);
-            triangulate_polygon(polygon);
+            triangulate_polygon(polygon, sub_bounds);
         }
     }
 }
@@ -188,7 +188,7 @@ Mesh::VertexHandle UVClipper::add_intersection_point(float t, const Mesh::Vertex
     return vh;
 }
 
-void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polygon)
+void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polygon, const Bounds2D& bounds)
 {
     if (polygon.size() == 0)
         return;
@@ -200,7 +200,7 @@ void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polyg
 
     std::vector<Mesh::VertexHandle> new_polygon;
     for (const auto vh: polygon) {
-        const auto new_vh = copy_vertex_to_clipped_mesh(vh);
+        const auto new_vh = copy_vertex_to_clipped_mesh(vh, bounds);
         new_polygon.push_back(new_vh);
     }
 
@@ -218,15 +218,16 @@ void UVClipper::triangulate_polygon(const std::vector<Mesh::VertexHandle>& polyg
     }
 }
 
-Mesh::VertexHandle UVClipper::copy_vertex_to_clipped_mesh(const Mesh::VertexHandle& vh)
+Mesh::VertexHandle UVClipper::copy_vertex_to_clipped_mesh(const Mesh::VertexHandle& vh, const Bounds2D& bounds)
 {
     auto p = m_mesh.point(vh);
     auto v0 = m_clipped_mesh.add_vertex(p);
 
     auto uv = m_mesh.texcoord2D(vh);
 
-    uv[0] = uv[0] - std::floor(uv[0]);
-    uv[1] = uv[1] - std::floor(uv[1]);
+    const auto bounds_min = bounds.min();
+    uv[0] = uv[0] - bounds_min.x;
+    uv[1] = uv[1] - bounds_min.y;
 
     m_clipped_mesh.set_texcoord2D(v0, uv);
     return v0;

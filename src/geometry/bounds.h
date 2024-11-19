@@ -34,7 +34,7 @@ public:
     void encapsulate(const T& point)
     {
         T min_point = glm::min(min(), point);
-        T::vec3 max_point = glm::max(max(), point);
+        T max_point = glm::max(max(), point);
         center = 0.5f * (min_point + max_point);
         extents = 0.5f * (max_point - min_point);
     }
