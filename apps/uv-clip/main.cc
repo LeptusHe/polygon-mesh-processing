@@ -39,10 +39,6 @@ int main(int argc, char *argv[])
         PrintMeshInfo(mesh);
     }
 
-    mesh.request_vertex_status();
-    mesh.request_edge_status();
-    mesh.request_face_status();
-
     if (!mesh.has_vertex_texcoords2D()) {
         spdlog::info("failed to load mesh with tex coord, exit!");
         return -1;
@@ -63,10 +59,10 @@ int main(int argc, char *argv[])
 
         OpenMesh::IO::Options write_opt = OpenMesh::IO::Options::VertexTexCoord;
         if (!OpenMesh::IO::write_mesh(clipped_mesh, output_path, write_opt)) {
-            std::cerr << fmt::format("failed to write mesh to [{0}]", path) << std::endl;
+            std::cerr << fmt::format("failed to write mesh to [{0}]", output_path) << std::endl;
             return 1;
         } else {
-            std::cout << fmt::format("succeed to write mesh to [{0}]", path) << std::endl;
+            std::cout << fmt::format("succeed to write mesh to [{0}]", output_path) << std::endl;
         }
     } catch (std::exception& e) {
         std::cerr << fmt::format("failed to write mesh because [{0}]", e.what()) << std::endl;
