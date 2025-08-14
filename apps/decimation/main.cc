@@ -13,6 +13,8 @@
 #include <igl/qslim.h>
 #include <igl/qslim_optimal_collapse_edge_callbacks.h>
 
+#include "igl/max_faces_stopping_condition.h"
+
 int main(int argc, char * argv[])
 {
     using namespace std;
@@ -30,11 +32,11 @@ int main(int argc, char * argv[])
         std::cout << fmt::format("failed to load mesh: [{0}]", path);
         return -1;
     } else {
-        std::cout << fmt::format("vertex count: {}\n", V.rows());
-        std::cout << fmt::format("face count: {}\n", F.rows());
+        std::cout << fmt::format("vertex count: {}\n", OV.rows());
+        std::cout << fmt::format("face count: {}\n", OF.rows());
     }
 
-    int min_vert_cnt = 300;
+    int min_vert_cnt = 0.2f * OV.rows();
 
     igl::opengl::glfw::Viewer viewer;
 
@@ -47,11 +49,42 @@ int main(int argc, char * argv[])
     MatrixXd C;
     int num_collapsed;
 
+    bool use_qslim = false;
+
     // Function to reset original mesh and data structures
     const auto & reset = [&]()
     {
         F = OF;
         V = OV;
+
+        if (use_qslim) {
+            Eigen::MatrixXd U;
+            Eigen::MatrixXi G;
+            Eigen::VectorXi I,J;
+            if (!igl::qslim(V, F, min_vert_cnt, U, G, I, J)) {
+                std::cout << "qslim failed" << std::endl;
+                return;
+            } else {
+                viewer.data().clear();
+                viewer.data().set_mesh(U, G);
+                viewer.data().set_face_based(true);
+            }
+            return;
+        } else {
+            Eigen::MatrixXd U;
+            Eigen::MatrixXi G;
+            Eigen::VectorXi I,J;
+
+            int m = OF.rows();
+            igl::decimate_stopping_condition_callback stop_callback = igl::max_faces_stopping_condition(m, m, min_vert_cnt);
+            igl::decimate(V, F, igl::shortest_edge_and_midpoint, stop_callback, U, G, I, J);
+            viewer.data().clear();
+            viewer.data().set_mesh(U, G);
+            viewer.data().set_face_based(true);
+
+            return;
+        }
+
         edge_flaps(F,E,EMAP,EF,EI);
         C.resize(E.rows(),V.cols());
         VectorXd costs(E.rows());
@@ -83,6 +116,11 @@ int main(int argc, char * argv[])
 
     const auto &pre_draw = [&](igl::opengl::glfw::Viewer & viewer)->bool
     {
+        return false;
+
+        if (use_qslim)
+            return false;
+
         auto vert_cnt = OV.rows() - num_collapsed;
         if (min_vert_cnt >= vert_cnt) {
             return false;
