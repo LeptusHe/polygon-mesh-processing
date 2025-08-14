@@ -34,6 +34,8 @@ int main(int argc, char * argv[])
         std::cout << fmt::format("face count: {}\n", F.rows());
     }
 
+    int min_vert_cnt = 300;
+
     igl::opengl::glfw::Viewer viewer;
 
     // Prepare array-based edge data structures and priority queue
@@ -81,6 +83,11 @@ int main(int argc, char * argv[])
 
     const auto &pre_draw = [&](igl::opengl::glfw::Viewer & viewer)->bool
     {
+        auto vert_cnt = OV.rows() - num_collapsed;
+        if (min_vert_cnt >= vert_cnt) {
+            return false;
+        }
+
         // If animating then collapse 10% of edges
         if(viewer.core().is_animating && !Q.empty())
         {
