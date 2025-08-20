@@ -5,16 +5,24 @@ class vertex_merger {
 private:
 
 public:
-    Mesh Merge(Mesh& mesh);
+    CMesh Merge(CMesh& mesh);
+
 
 private:
-    void CollectMeshData(const Mesh& mesh);
+    void CollectMeshData(const CMesh& mesh);
     void MergeVertex();
     Mesh RebuildMesh();
     void OutputSortedVertex(const std::vector<Mesh::Point>& points);
+    //Mesh RebuildMesh();
 
 private:
-    std::vector<Mesh::Point> m_vertices;
-    std::vector<Mesh::Point> m_newVertices;
-    std::vector<int> m_indices;
+    std::vector<CMesh::Point> m_vertices;
+    std::vector<CMesh::Point> m_newVertices;
+    std::vector<std::vector<std::size_t>> m_indices;
 };
+
+
+int RemoveDuplicationVertex(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons);
+int FixInvalidOrientation(std::vector<CMesh::Point>& points, std::vector<std::vector<std::size_t>>& polygons);
+std::vector<CMesh::Point> SortPoints(const std::vector<CMesh::Point>& input);
+void PrintSortedPoints(const std::vector<CMesh::Point>& points);

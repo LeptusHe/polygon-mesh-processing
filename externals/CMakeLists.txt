@@ -8,7 +8,7 @@ set(LIBIGL_EMBREE OFF CACHE BOOL "disable embree")
 set(LIBIGL_GLFW ON CACHE BOOL "enable glfw")
 set(LIBIGL_IMGUI ON CACHE BOOL "enable imgui")
 set(LIBIGL_OPENGL ON CACHE BOOL "enable opengl")
-set(LIBIGL_PNG OFF CACHE BOOL "disable png")
+set(LIBIGL_PNG ON CACHE BOOL "enable png")
 set(LIBIGL_PREDICATES OFF CACHE BOOL "disable predicates")
 set(LIBIGL_XML OFF CACHE BOOL "disable xml")
 

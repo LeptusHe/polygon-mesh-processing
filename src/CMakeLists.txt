@@ -15,8 +15,16 @@ add_library(meshlib STATIC
     utils/vertex_merger.h
     simplification/simplification.cc
     simplification/simplification.h
+    simplification/ModVertexColorQuadricT.cc
+    simplification/ModVertexColorQuadricT.h
     visualization/mesh_vis.cc
-    visualization/mesh_vis.h)
+    repair/repair.cc
+    filesys/filesys.cc
+    geometry/barycentric-coord.cc
+    geometry/intersection.cc
+    texture/texture.cc
+    pmp/clip/uv-clipper.cc
+    ../apps/mesh-segmentation/bounds.h)
 
 set_target_properties(meshlib PROPERTIES OUTPUT_NAME "meshlib")
 target_compile_definitions(meshlib PUBLIC _USE_MATH_DEFINES)
@@ -24,12 +32,15 @@ target_compile_definitions(meshlib PUBLIC _USE_MATH_DEFINES)
 target_include_directories(meshlib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${third_party_include_dirs}
-    ${OPENMESH_INCLUDE_DIRS})
+    ${OPENMESH_INCLUDE_DIRS}
+)
 
 target_link_libraries(meshlib PUBLIC
     ${OPENMESH_LIBRARIES}
     CGAL::CGAL
     igl::core
+    igl::png
     fmt::fmt
     Eigen3::Eigen
-    spdlog::spdlog)
+    spdlog::spdlog
+)

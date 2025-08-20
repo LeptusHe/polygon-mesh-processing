@@ -4,10 +4,6 @@
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
 
-
-
-
-
 int main(int argc, char *argv[])
 {
     return interactive(argc, argv);

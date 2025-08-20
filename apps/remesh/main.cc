@@ -11,6 +11,7 @@
 #include "remesh/remesher.h"
 #include "utils/vertex_merger.h"
 #include "utils/mesh_io.h"
+#include "repair/repair.h"
 #include "simplification/simplification.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -23,6 +24,12 @@
 #include <CGAL/polygon_mesh_processing/remesh.h>
 #include <CGAL/polygon_mesh_processing/merge_border_vertices.h>
 #include <CGAL/polygon_mesh_processing/remesh_planar_patches.h>
+#include <CGAL/polygon_mesh_processing/polygon_mesh_to_polygon_soup.h>
+#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
+#include <CGAL/polygon_mesh_processing/orientation.h>
+#include <CGAL/Polygon_mesh_processing/surface_Delaunay_remeshing.h>
+#include <CGAL/Polygon_mesh_processing/detect_features.h>
+#include <CGAL/Polygon_mesh_processing/region_growing.h>
 #include <igl/file_dialog_open.h>
 
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
@@ -39,6 +46,18 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
     std::cout << fmt::format("face count: {}\n", mesh.n_faces());
     std::cout << fmt::format("edge count: {}\n", mesh.n_edges());
     std::cout << fmt::format("half edge count: {}\n\n", mesh.n_halfedges());
+}
+
+void PrintMeshInfo(const CMesh& mesh, const std::string& header = "")
+{
+    if (!header.empty()) {
+        std::cout << header << std::endl;
+    }
+
+    std::cout << fmt::format("vertex count: {}\n", mesh.num_vertices());
+    std::cout << fmt::format("face count: {}\n", mesh.num_faces());
+    std::cout << fmt::format("edge count: {}\n", mesh.num_edges());
+    std::cout << fmt::format("half edge count: {}\n\n", mesh.num_halfedges());
 }
 
 bool SplitOneLongEdge(Mesh& mesh, float target_edge_length)
@@ -402,6 +421,7 @@ bool ReadMesh(const std::string& path, Mesh& mesh, CMesh& cmesh)
         return false;
     } else {
         spdlog::info("succeed to read cgal mesh from path {}", path);
+        PrintMeshInfo(cmesh);
     }
 
     return true;
@@ -451,7 +471,7 @@ int main(int argc, char *argv[])
         if (ImGui::Button("merge vertex")) {
             vertex_merger vertexMerger;
             std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
-            mesh = vertexMerger.Merge(mesh);
+            //mesh = vertexMerger.Merge(mesh);
             std::cout << "n_face: " << mesh.n_faces() << " vertex: " << mesh.n_vertices() << std::endl;
         }
 
@@ -552,24 +572,177 @@ int main(int argc, char *argv[])
                 meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
             }
 
+            if (ImGui::Button("repair hole"))  {
+                auto cloneMesh = cmesh;
+
+                int hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
+                spdlog::info("hole count: {}", hole_cnt);
+
+                meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+            }
+
             if (ImGui::Button("cgal remesh")) {
                 auto cloneMesh = cmesh;
-                pmp::merge_duplicated_vertices_in_boundary_cycles(cloneMesh);
-                pmp::isotropic_remeshing(CGAL::faces(cloneMesh), static_cast<double>(target_edge_length), cloneMesh,
-                                         pmp::parameters::number_of_iterations(10)
-                                                 .protect_constraints(keep_boundary)
-                                                 .do_project(project));
-                cloneMesh.collect_garbage();
+
+                int hole_cnt = 0;
+                do {
+                    cloneMesh = Repair(cloneMesh);
+                    pmp::merge_duplicated_vertices_in_boundary_cycles(cloneMesh);
+                    pmp::stitch_boundary_cycles(cloneMesh);
+                    pmp::stitch_borders(cloneMesh);
+
+                    pmp::isotropic_remeshing(CGAL::faces(cloneMesh), static_cast<double>(target_edge_length), cloneMesh,
+                                            pmp::parameters::number_of_iterations(50)
+                                                    .protect_constraints(keep_boundary)
+                                                    .do_project(project));
+
+                    hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
+                    spdlog::info("hole count: {}", hole_cnt);
+                    cloneMesh.collect_garbage();
+                } while (hole_cnt > 0);
+
                 meshlib::MeshUtils::ConvertMeshToViewer(cloneMesh, viewer);
+                WriteMesh(cloneMesh, "data/remesh-grid.obj");
+
+                cmesh = cloneMesh;
+            }
+
+            if (ImGui::Button("get components")) {
+                using face_descriptor = boost::graph_traits<CMesh>::face_descriptor;
+
+                auto f_map = cmesh.add_property_map<CMesh::Face_index, int>("f:component-id").first;
+
+                auto num_comp = pmp::connected_components(cmesh, f_map);
+                spdlog::info("component num: {}", num_comp);
             }
 
             if (ImGui::Button("cagl plannar patch remesh")) {
                 //pmp::remesh
                 auto cloneMesh = cmesh;
-                pmp::duplicate_non_manifold_vertices(cloneMesh);
+
+                int small_hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
+
+
+                //int invalid_edges_cnt = meshlib::CheckInvalidEdges(cloneMesh);
+                pmp::remove_degenerate_edges(cloneMesh);
+                //pmp::remove_degenerate_faces(cloneMesh);
+                //invalid_edges_cnt = meshlib::CheckInvalidEdges(cloneMesh);
+                small_hole_cnt = FillSmallHoles(cloneMesh, 5, 10);
+                //spdlog::info("invalid edges: {}", invalid_edges_cnt);
+
+                auto f_map = cloneMesh.add_property_map<CMesh::Face_index, int>("f:component-id").first;
+                auto num_comp = pmp::connected_components(cloneMesh, f_map);
+                spdlog::info("before clone mesh component num: {}", num_comp);
+
+                pmp::merge_duplicated_vertices_in_boundary_cycles(cloneMesh);
+
+                std::vector<CMesh::Point> points;
+                std::vector<std::vector<std::size_t>> polygon;
+                pmp::polygon_mesh_to_polygon_soup(cloneMesh, points, polygon);
+
+
+                int num_removed = pmp::merge_duplicate_points_in_polygon_soup(points, polygon);
+                /*
+                , [](const CMesh::Point& lhs, const CMesh::Point& rhs) {
+                    constexpr float maxDigits = 100.0f;
+
+                    auto lhs_x = static_cast<int64_t>(lhs[0] * maxDigits);
+                    auto lhs_y = static_cast<int64_t>(lhs[1] * maxDigits);
+                    auto lhs_z = static_cast<int64_t>(lhs[2] * maxDigits);
+
+                    auto rhs_x = static_cast<int64_t>(rhs[0] * maxDigits);
+                    auto rhs_y = static_cast<int64_t>(rhs[1] * maxDigits);
+                    auto rhs_z = static_cast<int64_t>(rhs[2] * maxDigits);
+
+                    return (lhs_x == rhs_x) && (lhs_y == rhs_y) && (lhs_z == rhs_z);
+                });
+                 */
+                spdlog::info("removed vertex: {}", num_removed);
+
+                num_removed = RemoveDuplicationVertex(points, polygon);
+                spdlog::info("custom removed vertex: {}", num_removed);
+
+                auto reverse_faces = FixInvalidOrientation(points, polygon);
+                spdlog::info("reverse faces: {}", reverse_faces);
+
+                auto sorted_points = SortPoints(points);
+                PrintSortedPoints(sorted_points);
+
+                auto num_faces = pmp::merge_duplicate_polygons_in_polygon_soup(points, polygon);
+                spdlog::info("remove face: {}", num_faces);
+
+                pmp::repair_polygon_soup(points, polygon);
+
+                auto another_num_removed = pmp::merge_duplicate_points_in_polygon_soup(points, polygon);
+                spdlog::info("remove again vertex: {}", another_num_removed);
+
+
+                //auto stitch_cnt = pmp::stitch_borders(cloneMesh);
+                //std::cout << "stitch count: " << stitch_cnt << std::endl;
+
+                //pmp::remove_degenerate_edges()
+                //pmp::remove_degenerate_faces()
+                if (!pmp::orient_polygon_soup(points, polygon)) {
+                    spdlog::info("invalid orient");
+                }
+
+                //reverse_faces = FixInvalidOrientation(points, polygon);
+                //spdlog::info("reverse faces: {}", reverse_faces);
+
+                CMesh clean_mesh;
+                pmp::polygon_soup_to_polygon_mesh(points, polygon, clean_mesh);
+
+                //invalid_edges_cnt = meshlib::CheckInvalidEdges(cloneMesh);
+                //spdlog::info("invalid edges: {}", invalid_edges_cnt);
+
+                //int hole_cnt = FillSmallHoles(clean_mesh, 5.0, 10);
+                //spdlog::info("fill hole count: {}", hole_cnt);
+
+                /*
+                points.clear();
+                polygon.clear();
+                pmp::polygon_mesh_to_polygon_soup(clean_mesh, points, polygon);
+                pmp::repair_polygon_soup(points, polygon);
+
+                //reverse_faces = FixInvalidOrientation(points, polygon);
+                //spdlog::info("fill hole count: {}", hole_cnt);
+
+                pmp::polygon_soup_to_polygon_mesh(points, polygon, clean_mesh);
+                //pmp::orient_polygon_soup()
+                 */
+
+
+                f_map = clean_mesh.add_property_map<CMesh::Face_index, int>("f:component-id").first;
+                num_comp = pmp::connected_components(clean_mesh, f_map);
+                spdlog::info("after clone mesh component num: {}", num_comp);
+
+                int stitch_cnt = pmp::stitch_boundary_cycles(clean_mesh);
+                pmp::remove_degenerate_faces(clean_mesh);
+                pmp::orient(clean_mesh);
+                pmp::merge_reversible_connected_components(clean_mesh);
+
+                clean_mesh.collect_garbage();
+
+                clean_mesh = Repair(clean_mesh);
+                spdlog::info("stitch count: {}", stitch_cnt);
+
+
+                auto invalid_edges_cnt = meshlib::CheckInvalidEdges(clean_mesh);
+                spdlog::info(invalid_edges_cnt);
+
+                //auto non_manifold_vertex_cnt = pmp::duplicate_non_manifold_vertices(clean_mesh);
+                //spdlog::info("duplicate non manifold vertex: {}", non_manifold_vertex_cnt);
+
+                // output vertexs
+                pmp::polygon_mesh_to_polygon_soup(clean_mesh, points, polygon);
+                for (int i = 0; i < points.size(); ++ i) {
+                    auto p = points[i];
+                    spdlog::info("v:{}, {}, {}, {}", i, p.x(), p.y(), p.z());
+                }
 
                 CMesh outMesh;
-                pmp::remesh_planar_patches(cloneMesh, outMesh);
+                float cos_theta = 0.99;
+                pmp::remesh_planar_patches(clean_mesh, outMesh, pmp::parameters::cosine_of_maximum_angle(cos_theta));
                                            //pmp::parameters::cosine_of_maximum_angle(0.99));
                 //pmp::remesh_almost_planar_patches(cloneMesh, outMesh);
                 outMesh.collect_garbage();
@@ -577,6 +750,12 @@ int main(int argc, char *argv[])
 
                 cmesh = outMesh;
                 meshlib::MeshUtils::ConvertMeshToViewer(outMesh, viewer);
+                f_map = outMesh.add_property_map<CMesh::Face_index, int>("f:component-id").first;
+                num_comp = pmp::connected_components(outMesh, f_map);
+                spdlog::info("remesh component num: {}", num_comp);
+
+                CollapseBoundaryEdge(outMesh);
+                meshlib::MeshUtils::ConvertMeshToViewer(clean_mesh, viewer);
 
                 auto logger = spdlog::basic_logger_mt("file-logger", "logs/remesh-result.txt");
 
@@ -586,6 +765,9 @@ int main(int argc, char *argv[])
                 auto sorted_points = meshlib::MeshUtils::GetSortedPoints(outMesh);
                 for (auto point : sorted_points) {
                     logger->info("v: {}, {}, {}", point[0], point[1], point[2]);
+                for (auto vertex : outMesh.vertices()) {
+                    auto point = outMesh.point(vertex);
+                    //spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
                 }
                 for (auto vertex : outMesh.vertices()) {
                     //auto point = outMesh.point(vertex);
@@ -606,6 +788,28 @@ int main(int argc, char *argv[])
                 std::cout << "found: " << count << std::endl;
                 meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
             }
+        }
+
+        if (ImGui::Button("remesh almost planar patch")) {
+            CMesh out_mesh;
+
+            //pmp::region_growing_of_planes_on_faces(cmesh, )
+            //pmp::remesh_almost_planar_patches(cmesh, out_mesh, )
+        }
+
+        if (ImGui::Button("delaunay remesh")) {
+            using EIFMap = boost::property_map<CMesh, CGAL::edge_is_feature_t>::type;
+
+            EIFMap eif = CGAL::get(CGAL::edge_is_feature, cmesh);
+            pmp::detect_sharp_edges(cmesh, 45, eif);
+
+            auto out_mesh = pmp::surface_Delaunay_remeshing(cmesh,
+                                                            CGAL::parameters::protect_constraints(false).
+                                                            mesh_edge_size(10.0).
+                                                            mesh_facet_distance(10.0).
+                                                            edge_is_constrained_map(eif));
+
+            meshlib::MeshUtils::ConvertMeshToViewer(out_mesh, viewer);
         }
 
         if (ImGui::Button("write mesh")) {
