@@ -36,7 +36,7 @@ int main(int argc, char * argv[])
         std::cout << fmt::format("face count: {}\n", OF.rows());
     }
 
-    int min_vert_cnt = 0.2f * OV.rows();
+    int min_vert_cnt = 0.1f * OV.rows();
 
     igl::opengl::glfw::Viewer viewer;
 
@@ -49,7 +49,7 @@ int main(int argc, char * argv[])
     MatrixXd C;
     int num_collapsed;
 
-    bool use_qslim = false;
+    bool use_qslim = true;
 
     // Function to reset original mesh and data structures
     const auto & reset = [&]()
@@ -69,6 +69,9 @@ int main(int argc, char * argv[])
                 viewer.data().set_mesh(U, G);
                 viewer.data().set_face_based(true);
             }
+
+            std::cout << fmt::format("vertex count: {}\n", U.rows());
+            std::cout << fmt::format("face count: {}\n", G.rows());
             return;
         } else {
             Eigen::MatrixXd U;
@@ -81,6 +84,9 @@ int main(int argc, char * argv[])
             viewer.data().clear();
             viewer.data().set_mesh(U, G);
             viewer.data().set_face_based(true);
+
+            std::cout << fmt::format("vertex count: {}\n", U.rows());
+            std::cout << fmt::format("face count: {}\n", G.rows());
 
             return;
         }
