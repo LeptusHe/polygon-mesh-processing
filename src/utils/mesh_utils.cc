@@ -146,6 +146,8 @@ void CollectMeshData(const Mesh& mesh, std::vector<float>& vertices, std::vector
             vIdx += 1;
         }
     }
+}
+
 int CheckInvalidEdges(CMesh& clean_mesh)
 {
     auto col_map = clean_mesh.add_property_map<CMesh::Vertex_index, Eigen::Vector3d>("v:colors").first;
@@ -272,30 +274,6 @@ CMesh ConstructSurfaceMesh(const float *vertices, const float* normals, int numV
     }
 
     return mesh;
-}
-
-void CollectMeshData(const Mesh& mesh, std::vector<float>& vertices, std::vector<int>& indices)
-{
-    vertices.resize(3 * mesh.n_vertices());
-    for (auto vertex : mesh.vertices()) {
-        auto idx = vertex.idx();
-        auto p = mesh.point(vertex);
-
-        vertices[3 * idx + 0] = p[0];
-        vertices[3 * idx + 1] = p[1];
-        vertices[3 * idx + 2] = p[2];
-    }
-
-    indices.resize(3 * mesh.n_faces());
-    for (auto fh : mesh.faces()) {
-        auto faceIndex = fh.idx();
-
-        int vIdx = 0;
-        for (auto vh : fh.vertices()) {
-            indices[3 * faceIndex + vIdx] = vh.idx();
-            vIdx += 1;
-        }
-    }
 }
 
 CMesh ConvertOpenMeshToSurfaceMesh(const Mesh& mesh)

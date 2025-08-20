@@ -28,6 +28,7 @@ public:
     static std::vector<CMesh::Point> GetSortedPoints(const std::vector<CMesh::Point>& points);
 };
 
+void CollectMeshData(const Mesh& mesh, std::vector<float>& vertices, std::vector<int>& indices);
 CMesh ConstructMesh(const float *vertices, const float* normals, int numVertices, const int *indices, int triangleNum);
 int CheckInvalidEdges(CMesh& clean_mesh);
 Mesh ConvertToMesh(const CMesh& cmesh);
