@@ -762,15 +762,9 @@ int main(int argc, char *argv[])
                 logger->info("old: vertex: {}, faces: {}", cmesh.num_vertices(), cmesh.num_faces());
                 logger->info("new: vertex: {}, faces: {}", outMesh.num_vertices(), outMesh.num_faces());
 
-                auto sorted_points = meshlib::MeshUtils::GetSortedPoints(outMesh);
-                for (auto point : sorted_points) {
-                    logger->info("v: {}, {}, {}", point[0], point[1], point[2]);
                 for (auto vertex : outMesh.vertices()) {
                     auto point = outMesh.point(vertex);
                     //spdlog::info("v: {}, {}, {}", point[0], point[1], point[2]);
-                }
-                for (auto vertex : outMesh.vertices()) {
-                    //auto point = outMesh.point(vertex);
                 }
                 logger->flush();
 
