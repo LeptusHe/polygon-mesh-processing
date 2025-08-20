@@ -163,7 +163,8 @@ Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandl
         const auto uv = barycentric_coord.Interpolate(coords[0], coords[1], coords[2]);
 
         // TODO: what is hat function?
-        val += barycentric_coord.x * tex_.Sample(uv);
+        const auto flip_uv = OpenMesh::Vec2f(uv[0], 1 - uv[1]);
+        val += barycentric_coord.x * tex_.Sample(flip_uv);
         //val += barycentric_coord.z * Eigen::Vector3f(1, 1, 1);
     }
     return val;
