@@ -36,8 +36,8 @@ def create_plane_mesh(x_segment, y_segment, file_path):
 
 
 if __name__ == '__main__':
-    x_segment = 100
-    y_segment = 100
+    x_segment = 10
+    y_segment = 10
 
-    path = "./plane_test.obj"
+    path = "./plane_test_{}_{}.obj".format(x_segment, y_segment)
     create_plane_mesh(x_segment, y_segment, path)
