@@ -38,11 +38,14 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
 
 int main(int argc, char *argv[])
 {
-    auto path = argc > 1 ? argv[1] : "data/quad.obj";
+    auto path = argc > 1 ? argv[1] : "data/quad_100_100.obj";
 
     std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
     path = "./data/baking/PGD_WildBossA.obj";
-    path = "./data/baking/plane_test.obj";
+    //path = "./data/baking/plane_test_30_30.obj";
+    //path = "./data/baking/plane_test_20_20.obj";
+    path = "./data/baking/plane_test_10_10.obj";
+    //path = "./data/baking/random_plane_10.0_8.0_100.obj";
 
     Texture tex;
     if (!tex.Load(tex_file_path)) {
@@ -131,14 +134,20 @@ int main(int argc, char *argv[])
     viewer.plugins.push_back(&plugin);
     plugin.widgets.push_back(&menu);
 
+    bool debug_integral_method = false;
     int current_method = static_cast<int>(BakingMethod::PointSampling);
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
+        bool resolve_vertex_color = false;
+        if (ImGui::Checkbox("debug integral method", &debug_integral_method)) {
+            resolve_vertex_color = true;
+        }
+
         ImGui::Separator();
 
         const char* items[] = {"Point Sampling", "Least Squares"};
-        if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items))) {
+        if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items)) || resolve_vertex_color) {
             auto method = static_cast<BakingMethod>(current_method);
             std::unique_ptr<VertexBaker> vertex_baker;
             switch (method) {
@@ -147,7 +156,9 @@ int main(int argc, char *argv[])
                     break;
                 }
                 case BakingMethod::LeastSquares: {
-                    vertex_baker = std::make_unique<LeastSquaresVertexBaker>(mesh, tex);
+                    LeastSquaresVertexBaker::Options options;
+                    options.debug_integral_method = debug_integral_method;
+                    vertex_baker = std::make_unique<LeastSquaresVertexBaker>(mesh, tex, options);
                     break;
                 }
                 default: {

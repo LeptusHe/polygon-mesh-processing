@@ -6,9 +6,10 @@
 
 namespace meshlib {
 
-LeastSquaresVertexBaker::LeastSquaresVertexBaker(Mesh& mesh, Texture& tex)
+LeastSquaresVertexBaker::LeastSquaresVertexBaker(Mesh& mesh, Texture& tex, const Options& options)
     : mesh_(mesh)
     , tex_(tex)
+    , options_(options)
     , v_prop_(mesh, "v_prop")
     , e_prop_(mesh, "e_prop")
     , v_constant_prop_(mesh, "v_constant_prop")
@@ -129,7 +130,7 @@ void LeastSquaresVertexBaker::CalculateConstantVector()
     for (const auto vh : mesh_.vertices()) {
         Eigen::Vector3f sum = Eigen::Vector3f::Zero();
         for (const auto fh : mesh_.vf_range(vh)) {
-            sum += CalculateConstantFactor(fh);
+            sum += CalculateConstantFactor(fh, vh);
         }
         v_constant_prop_[vh] = sum;
     }
@@ -146,21 +147,41 @@ void LeastSquaresVertexBaker::CalculateConstantVector()
     }
 }
 
-Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandle fh)
+int get_triangle_index(int i)
+{
+    return i % 3;
+}
+
+Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandle fh, Mesh::VertexHandle v)
 {
     Mesh::TexCoord2D coords[3];
 
+    int v0_index = -1;
     int index = 0;
     for (const auto vh : mesh_.fv_range(fh)) {
         coords[index] = mesh_.texcoord2D(vh);
+        if (vh == v) {
+            v0_index = index;
+        }
         index += 1;
     }
+
+    if (options_.debug_integral_method) {
+        v0_index = 0;
+    }
+
+    int v0_id = (v0_index + 0) % 3;
+    int v1_id = (v0_index + 1) % 3;
+    int v2_id = (v0_index + 2) % 3;
 
     const auto sample_num = barycentric_coords_.size();
     Eigen::Vector3f val = Eigen::Vector3f::Zero();
     for (int i = 0; i < sample_num; ++ i) {
         auto& barycentric_coord = barycentric_coords_[i];
-        const auto uv = barycentric_coord.Interpolate(coords[0], coords[1], coords[2]);
+        const auto uv = barycentric_coord.Interpolate(
+            coords[v0_id],
+            coords[v1_id],
+            coords[v2_id]);
 
         // TODO: what is hat function?
         const auto flip_uv = OpenMesh::Vec2f(uv[0], 1 - uv[1]);

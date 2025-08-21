@@ -10,7 +10,13 @@ namespace meshlib {
 
 class LeastSquaresVertexBaker : public VertexBaker {
 public:
-    LeastSquaresVertexBaker(Mesh& mesh, Texture& tex);
+    struct Options {
+        bool enable_edge_regularization = false;
+        bool debug_integral_method = false;
+    };
+
+public:
+    LeastSquaresVertexBaker(Mesh& mesh, Texture& tex, const Options& options);
     void Solve() override;
 
 private:
@@ -18,7 +24,7 @@ private:
     void GenerateSamplingSamples();
     void CalculateCoefficientMatrix();
     void CalculateConstantVector();
-    Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh);
+    Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh, Mesh::VertexHandle v);
     void SolveLinerEquation();
     float ConvertToColorValue(float v);
 
@@ -29,6 +35,7 @@ private:
     Mesh& mesh_;
     std::vector<BarycentricCoords> barycentric_coords_;
     Texture tex_;
+    Options options_;
 };
 
 } // namespace meshlib
