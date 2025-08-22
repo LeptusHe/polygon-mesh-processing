@@ -26,23 +26,45 @@ LeastSquaresVertexBaker::LeastSquaresVertexBaker(Mesh& mesh, Texture& tex, const
     Init();
 }
 
+bool IsValidSample(const Eigen::Vector2f& sample)
+{
+    const auto x = sample[0];
+    const auto y = sample[1];
+
+    if (x < 0.0f || x > 1.0f || y < 0.0f || y > 1.0f)
+        return false;
+
+    const auto sum = x+ y;
+    if (0.0f > sum || 1.0f < sum)
+        return false;
+
+    return true;
+}
+
 
 void LeastSquaresVertexBaker::Init()
 {
-    const int sample_num = 1024;
-    barycentric_coords_.resize(sample_num);
+    const auto sample_num = options_.sample_num;
 
-    UniformSampler sampler;
-    for (int i = 0; i < sample_num; ++ i) {
-        const auto sample = sampler.Get2D();
-        barycentric_coords_[i] = BarycentricCoords(sample[0], sample[1], 1.0f - sample[0] - sample[1]);
+    if (options_.enable_random_sample) {
+        UniformSampler sampler;
+        barycentric_coords_.resize(sample_num);
+
+        for (int i = 0; i < sample_num; ++ i) {
+            Eigen::Vector2f sample;
+            do {
+                sample = sampler.Get2D();
+            } while (!IsValidSample(sample));
+
+            barycentric_coords_[i] = BarycentricCoords(sample[0], sample[1], 1.0f - sample[0] - sample[1]);
+        }
+    } else {
+        GenerateSamplingSamples(sample_num);
     }
-    GenerateSamplingSamples();
 }
 
-void LeastSquaresVertexBaker::GenerateSamplingSamples()
+void LeastSquaresVertexBaker::GenerateSamplingSamples(int sample_num)
 {
-    const int sample_num = 128;
     barycentric_coords_.resize(sample_num);
 
     for (int i = 0; i < sample_num; ++i)

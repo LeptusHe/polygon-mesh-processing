@@ -42,9 +42,9 @@ int main(int argc, char *argv[])
 
     std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
     path = "./data/baking/PGD_WildBossA.obj";
-    //path = "./data/baking/plane_test_30_30.obj";
+    path = "./data/baking/plane_test_30_30.obj";
     //path = "./data/baking/plane_test_20_20.obj";
-    path = "./data/baking/plane_test_10_10.obj";
+    //path = "./data/baking/plane_test_10_10.obj";
     //path = "./data/baking/random_plane_10.0_8.0_100.obj";
 
     Texture tex;
@@ -135,19 +135,29 @@ int main(int argc, char *argv[])
     plugin.widgets.push_back(&menu);
 
     bool debug_integral_method = false;
+    bool enable_random_sample = false;
+    int sample_num = 128;
     int current_method = static_cast<int>(BakingMethod::PointSampling);
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
-        bool resolve_vertex_color = false;
+        bool regenerate_vertex_color = false;
         if (ImGui::Checkbox("debug integral method", &debug_integral_method)) {
-            resolve_vertex_color = true;
+            regenerate_vertex_color = true;
+        }
+
+        if (ImGui::Checkbox("enable random sample", &enable_random_sample)) {
+            regenerate_vertex_color = true;
+        }
+
+        if (ImGui::SliderInt("sample num", &sample_num, 4, 512)) {
+            regenerate_vertex_color = true;
         }
 
         ImGui::Separator();
 
         const char* items[] = {"Point Sampling", "Least Squares"};
-        if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items)) || resolve_vertex_color) {
+        if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items)) || regenerate_vertex_color) {
             auto method = static_cast<BakingMethod>(current_method);
             std::unique_ptr<VertexBaker> vertex_baker;
             switch (method) {
@@ -158,6 +168,8 @@ int main(int argc, char *argv[])
                 case BakingMethod::LeastSquares: {
                     LeastSquaresVertexBaker::Options options;
                     options.debug_integral_method = debug_integral_method;
+                    options.enable_random_sample = enable_random_sample;
+                    options.sample_num = sample_num;
                     vertex_baker = std::make_unique<LeastSquaresVertexBaker>(mesh, tex, options);
                     break;
                 }

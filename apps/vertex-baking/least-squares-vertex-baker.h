@@ -11,6 +11,8 @@ namespace meshlib {
 class LeastSquaresVertexBaker : public VertexBaker {
 public:
     struct Options {
+        int sample_num = 128;
+        bool enable_random_sample = false;
         bool enable_edge_regularization = false;
         bool debug_integral_method = false;
     };
@@ -21,7 +23,7 @@ public:
 
 private:
     void Init();
-    void GenerateSamplingSamples();
+    void GenerateSamplingSamples(int sample_num);
     void CalculateCoefficientMatrix();
     void CalculateConstantVector();
     Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh, Mesh::VertexHandle v);
