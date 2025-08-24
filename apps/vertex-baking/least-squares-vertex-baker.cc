@@ -213,6 +213,82 @@ Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandl
     return val;
 }
 
+
+void LeastSquaresVertexBaker::BuildEdgeRegularizationMatrix()
+{
+    std::vector<Eigen::Triplet<float>> triplets;
+    for (const auto e : mesh_.edges()) {
+        if (e.is_boundary())
+            continue;
+
+        const auto h0 = mesh_.halfedge_handle(e, 0);
+        const auto h1 = mesh_.halfedge_handle(e, 1);
+
+        const auto face0 = mesh_.face_handle(h0);
+        const auto face1 = mesh_.face_handle(h1);
+
+        OpenMesh::VertexHandle vertex_ids[3];
+        Eigen::Vector3f points[3];
+        int vertex_index = 0;
+        for (const auto vh : mesh_.fv_range(face0)) {
+            const auto p = mesh_.point(vh);
+            points[vertex_index] = Eigen::Vector3f(p[0], p[1], p[2]);
+            vertex_ids[vertex_index] = vh;
+            vertex_index += 1;
+        }
+
+        const auto v1_sub_v0 = points[1] - points[0];
+        const auto v2_sub_v0 = points[2] - points[0];
+        const auto normal_vec =  v1_sub_v0.cross(v2_sub_v0);
+        const auto normalized_normal = normal_vec.normalized();
+        const auto triangle_area = 0.5f * normal_vec.norm();
+
+        Eigen::Vector3f gradients[3];
+        for (int i = 0; i < 3; ++ i) {
+            const auto v0_idx = (i + 0) % 3;
+            const auto v1_idx = (i + 1) % 3;
+            const auto v2_idx = (i + 2) % 3;
+
+            const auto edge_vec = points[v2_idx] - points[v1_idx];
+            auto gradient_v0 = normal_vec.cross(edge_vec);
+            gradient_v0 *= 1.0f / (4.0f * triangle_area);
+
+            gradients[v0_idx] = gradient_v0;
+        }
+    }
+}
+
+void LeastSquaresVertexBaker::ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, VertexInfo *vertex_infos)
+{
+    int vertex_index = 0;
+    for (const auto vh : mesh_.fv_range(fh)) {
+        const auto p = mesh_.point(vh);
+        const auto pos = Eigen::Vector3f(p[0], p[1], p[2]);
+
+        vertex_infos[vertex_index].vh = vh;
+        vertex_infos[vertex_index].pos = pos;
+        vertex_index += 1;
+    }
+
+    const auto v1_sub_v0 = vertex_infos[1].pos - vertex_infos[0].pos;
+    const auto v2_sub_v0 = vertex_infos[2].pos - vertex_infos[0].pos;
+    const auto normal_vec =  v1_sub_v0.cross(v2_sub_v0);
+    const auto normalized_normal = normal_vec.normalized();
+    const auto triangle_area = 0.5f * normal_vec.norm();
+
+    for (int i = 0; i < 3; ++ i) {
+        const auto v0_idx = (i + 0) % 3;
+        const auto v1_idx = (i + 1) % 3;
+        const auto v2_idx = (i + 2) % 3;
+
+        const auto edge_vec = vertex_infos[v2_idx].pos - vertex_infos[v1_idx].pos;
+        auto gradient_v0 = normal_vec.cross(edge_vec);
+        gradient_v0 *= 1.0f / (4.0f * triangle_area);
+        
+        vertex_infos[v0_idx].gradient = gradient_v0;
+    }
+}
+
 void LeastSquaresVertexBaker::SolveLinerEquation()
 {
     Eigen::SparseMatrix<float> A(mesh_.n_vertices(), mesh_.n_vertices());

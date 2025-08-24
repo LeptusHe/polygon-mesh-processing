@@ -17,6 +17,13 @@ public:
         bool debug_integral_method = false;
     };
 
+private:
+    struct VertexInfo {
+        OpenMesh::VertexHandle vh;
+        Eigen::Vector3f pos;
+        Eigen::Vector3f gradient;
+    };
+
 public:
     LeastSquaresVertexBaker(Mesh& mesh, Texture& tex, const Options& options);
     void Solve() override;
@@ -27,8 +34,10 @@ private:
     void CalculateCoefficientMatrix();
     void CalculateConstantVector();
     Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh, Mesh::VertexHandle v);
+    void BuildEdgeRegularizationMatrix();
     void SolveLinerEquation();
     float ConvertToColorValue(float v);
+    void ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, VertexInfo *vertex_infos);
 
 private:
     OpenMesh::VProp<float> v_prop_;
