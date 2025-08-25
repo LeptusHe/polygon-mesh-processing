@@ -13,6 +13,7 @@ public:
     struct Options {
         int sample_num = 128;
         bool enable_random_sample = false;
+        float regularization_factor = 0.1f;
         bool enable_edge_regularization = false;
         bool debug_integral_method = false;
     };
@@ -34,10 +35,10 @@ private:
     void CalculateCoefficientMatrix();
     void CalculateConstantVector();
     Eigen::Vector3f CalculateConstantFactor(Mesh::FaceHandle fh, Mesh::VertexHandle v);
-    void BuildEdgeRegularizationMatrix();
     void SolveLinerEquation();
+    std::vector<Eigen::Triplet<float>> BuildEdgeRegularizationMatrix();
+    void ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, float& triangle_area, VertexInfo *vertex_infos);
     float ConvertToColorValue(float v);
-    void ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, VertexInfo *vertex_infos);
 
 private:
     OpenMesh::VProp<float> v_prop_;

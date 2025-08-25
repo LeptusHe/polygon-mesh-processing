@@ -214,7 +214,7 @@ Eigen::Vector3f LeastSquaresVertexBaker::CalculateConstantFactor(Mesh::FaceHandl
 }
 
 
-void LeastSquaresVertexBaker::BuildEdgeRegularizationMatrix()
+std::vector<Eigen::Triplet<float>> LeastSquaresVertexBaker::BuildEdgeRegularizationMatrix()
 {
     std::vector<Eigen::Triplet<float>> triplets;
     for (const auto e : mesh_.edges()) {
@@ -227,38 +227,56 @@ void LeastSquaresVertexBaker::BuildEdgeRegularizationMatrix()
         const auto face0 = mesh_.face_handle(h0);
         const auto face1 = mesh_.face_handle(h1);
 
-        OpenMesh::VertexHandle vertex_ids[3];
-        Eigen::Vector3f points[3];
-        int vertex_index = 0;
-        for (const auto vh : mesh_.fv_range(face0)) {
-            const auto p = mesh_.point(vh);
-            points[vertex_index] = Eigen::Vector3f(p[0], p[1], p[2]);
-            vertex_ids[vertex_index] = vh;
-            vertex_index += 1;
+        VertexInfo face0_vertex_infos[3];
+        float face0_area;
+        ComputeVertexGradientInTriangle(face0, face0_area, face0_vertex_infos);
+
+        VertexInfo face1_vertex_infos[3];
+        float face1_area;
+        ComputeVertexGradientInTriangle(face1, face1_area, face1_vertex_infos);
+
+        std::map<OpenMesh::VertexHandle, Eigen::Vector3f> gradient_map;
+        for (int i = 0; i < 3; ++ i) {
+            const auto vh = face0_vertex_infos[i].vh;
+            gradient_map[vh] = face0_vertex_infos[i].gradient;
         }
 
-        const auto v1_sub_v0 = points[1] - points[0];
-        const auto v2_sub_v0 = points[2] - points[0];
-        const auto normal_vec =  v1_sub_v0.cross(v2_sub_v0);
-        const auto normalized_normal = normal_vec.normalized();
-        const auto triangle_area = 0.5f * normal_vec.norm();
-
-        Eigen::Vector3f gradients[3];
         for (int i = 0; i < 3; ++ i) {
-            const auto v0_idx = (i + 0) % 3;
-            const auto v1_idx = (i + 1) % 3;
-            const auto v2_idx = (i + 2) % 3;
+            const auto vh = face1_vertex_infos[i].vh;
+            if (gradient_map.find(vh) != std::end(gradient_map)) {
+                gradient_map[vh] -= face1_vertex_infos[i].gradient;
+            } else {
+                gradient_map[vh] = -face1_vertex_infos[i].gradient;
+            }
+        }
 
-            const auto edge_vec = points[v2_idx] - points[v1_idx];
-            auto gradient_v0 = normal_vec.cross(edge_vec);
-            gradient_v0 *= 1.0f / (4.0f * triangle_area);
+        if (gradient_map.size() != 4) {
+            throw std::runtime_error("gradient map size is not 4");
+        }
 
-            gradients[v0_idx] = gradient_v0;
+        OpenMesh::VertexHandle vhs[4];
+        int index = 0;
+        for (const auto& [vh, gradient] : gradient_map) {
+            vhs[index] = vh;
+            index += 1;
+        }
+
+        float area = face0_area + face1_area;
+        for (int i = 0; i < 4; ++ i) {
+            for (int j = 0; j < 4; ++ j) {
+                const auto lhs_vh = vhs[i];
+                const auto rhs_vh = vhs[j];
+
+                const auto factor = area * options_.regularization_factor;
+                const auto val = factor * gradient_map[lhs_vh].dot(gradient_map[rhs_vh]) * area;
+                triplets.emplace_back(lhs_vh.idx(), rhs_vh.idx(), val);
+            }
         }
     }
+    return triplets;
 }
 
-void LeastSquaresVertexBaker::ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, VertexInfo *vertex_infos)
+void LeastSquaresVertexBaker::ComputeVertexGradientInTriangle(const OpenMesh::FaceHandle& fh, float& triangle_area, VertexInfo *vertex_infos)
 {
     int vertex_index = 0;
     for (const auto vh : mesh_.fv_range(fh)) {
@@ -274,7 +292,7 @@ void LeastSquaresVertexBaker::ComputeVertexGradientInTriangle(const OpenMesh::Fa
     const auto v2_sub_v0 = vertex_infos[2].pos - vertex_infos[0].pos;
     const auto normal_vec =  v1_sub_v0.cross(v2_sub_v0);
     const auto normalized_normal = normal_vec.normalized();
-    const auto triangle_area = 0.5f * normal_vec.norm();
+    triangle_area = 0.5f * normal_vec.norm();
 
     for (int i = 0; i < 3; ++ i) {
         const auto v0_idx = (i + 0) % 3;
@@ -305,6 +323,13 @@ void LeastSquaresVertexBaker::SolveLinerEquation()
         const auto val = e_prop_[eh];
         triples.emplace_back(v0.idx(), v1.idx(), val);
         triples.emplace_back(v1.idx(), v0.idx(), val);
+    }
+
+    if (options_.enable_edge_regularization) {
+        auto regularization_triples = BuildEdgeRegularizationMatrix();
+        triples.insert(std::end(triples),
+            std::begin(regularization_triples),
+            std::end(regularization_triples));
     }
 
     A.setFromTriplets(triples.begin(), triples.end());

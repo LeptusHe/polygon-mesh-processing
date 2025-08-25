@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 
     std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
     path = "./data/baking/PGD_WildBossA.obj";
-    path = "./data/baking/plane_test_30_30.obj";
+    //path = "./data/baking/plane_test_30_30.obj";
     //path = "./data/baking/plane_test_20_20.obj";
     //path = "./data/baking/plane_test_10_10.obj";
     //path = "./data/baking/random_plane_10.0_8.0_100.obj";
@@ -136,6 +136,8 @@ int main(int argc, char *argv[])
 
     bool debug_integral_method = false;
     bool enable_random_sample = false;
+    bool enable_edge_regularization = false;
+    float regularization_factor = 0.1f;
     int sample_num = 128;
     int current_method = static_cast<int>(BakingMethod::PointSampling);
     menu.callback_draw_viewer_menu = [&]() {
@@ -148,6 +150,16 @@ int main(int argc, char *argv[])
 
         if (ImGui::Checkbox("enable random sample", &enable_random_sample)) {
             regenerate_vertex_color = true;
+        }
+
+        if (ImGui::Checkbox("enable edge regularization", &enable_edge_regularization)) {
+            regenerate_vertex_color = true;
+        }
+
+        if (enable_edge_regularization) {
+            if (ImGui::SliderFloat("regularization factor", &regularization_factor, 0.0f, 1.0f)) {
+                regenerate_vertex_color = true;
+            }
         }
 
         if (ImGui::SliderInt("sample num", &sample_num, 4, 512)) {
@@ -169,6 +181,8 @@ int main(int argc, char *argv[])
                     LeastSquaresVertexBaker::Options options;
                     options.debug_integral_method = debug_integral_method;
                     options.enable_random_sample = enable_random_sample;
+                    options.enable_edge_regularization = enable_edge_regularization;
+                    options.regularization_factor = regularization_factor;
                     options.sample_num = sample_num;
                     vertex_baker = std::make_unique<LeastSquaresVertexBaker>(mesh, tex, options);
                     break;
