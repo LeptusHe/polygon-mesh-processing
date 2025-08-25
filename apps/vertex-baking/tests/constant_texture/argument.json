@@ -1,0 +1,12 @@
+{
+  "input mesh path" : "./data/baking/plane_test_10_10.obj",
+  "output mesh path": "./data/baking/result/plane_constant_tex_baking_result.obj",
+  "tex path" : "./apps/vertex-baking/tests/constant_texture/constant_color_texture.png",
+  "sample num": 512,
+  "optimization method" : "least-squares",
+  "sampling method" : "uniform",
+  "least squares options" : {
+    "enable edge regularization" : true,
+    "regularization factor": 0.1
+  }
+}

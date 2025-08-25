@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 #include <Eigen/Core>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
@@ -17,12 +18,69 @@
 
 using namespace meshlib;
 
-enum class BakingMethod {
+enum class OptimizationMethod {
     PointSampling,
     LeastSquares
 };
 
+enum class SamplingMethod {
+    Random,
+    Uniform
+};
+
 using Mesh = OpenMesh::TriMesh_ArrayKernelT<>;
+
+struct Options {
+    std::string input_mesh_path;
+    std::string output_mesh_path;
+    std::string tex_path;
+    int sample_num;
+    OptimizationMethod optimization_method;
+    SamplingMethod sampling_method;
+    bool enable_edge_regularization;
+    float regularization_factor;
+};
+
+Options ParseConfigFromJson(const std::string& config_path) {
+    Options config;
+    
+    try {
+        std::ifstream file(config_path);
+        if (!file.is_open()) {
+            throw std::runtime_error(fmt::format("Cannot open config file: {}", config_path));
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        config.input_mesh_path = j.value("input mesh path", "");
+        config.output_mesh_path = j.value("output mesh path", "");
+        config.tex_path = j.value("tex path", "");
+        config.sample_num = j.value("sample num", 512);
+
+        const auto opt_method = j.value("optimization method", "least-squares");
+        config.optimization_method = opt_method == "least-squares" ? OptimizationMethod::LeastSquares : OptimizationMethod::PointSampling;
+
+        const auto sampling_method = j.value("sampling method", "uniform");
+        config.sampling_method = sampling_method == "random" ? SamplingMethod::Random : SamplingMethod::Uniform;
+        
+        if (j.contains("least squares options")) {
+            auto ls_options = j["least squares options"];
+            config.enable_edge_regularization = ls_options.value("enable edge regularization", true);
+            config.regularization_factor = ls_options.value("regularization factor", 0.1f);
+        } else {
+            config.enable_edge_regularization = true;
+            config.regularization_factor = 0.1f;
+        }
+        
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to parse config file: {}", e.what());
+        throw;
+    }
+    
+    return config;
+}
+
 
 void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
 {
@@ -38,23 +96,25 @@ void PrintMeshInfo(const Mesh& mesh, const std::string& header = "")
 
 int main(int argc, char *argv[])
 {
-    auto path = argc > 1 ? argv[1] : "data/quad_100_100.obj";
-
-    std::string tex_file_path = "./data/baking/PGD_WildBossA_01_01_D.png";
-    path = "./data/baking/PGD_WildBossA.obj";
-    //path = "./data/baking/plane_test_30_30.obj";
-    //path = "./data/baking/plane_test_20_20.obj";
-    //path = "./data/baking/plane_test_10_10.obj";
-    //path = "./data/baking/random_plane_10.0_8.0_100.obj";
+    std::string config_path = argc > 1 ? argv[1] : "apps/vertex-baking/docs/arguments.json";
+    
+    Options config;
+    try {
+        config = ParseConfigFromJson(config_path);
+        spdlog::info("Successfully loaded config from: {}", config_path);
+    } catch (const std::exception& e) {
+        spdlog::error("failed to load config from: {}", config_path);
+        throw;
+    }
 
     Texture tex;
-    if (!tex.Load(tex_file_path)) {
+    if (!tex.Load(config.tex_path)) {
         return -1;
     }
 
     Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> R, G, B, A;
-    if (!igl::png::readPNG(tex_file_path, R, G, B, A)) {
-        spdlog::error("failed to read texture from path [{}]", tex_file_path);
+    if (!igl::png::readPNG(config.tex_path, R, G, B, A)) {
+        spdlog::error("failed to read texture from path [{}]", config.tex_path);
     }
 
     Mesh mesh;
@@ -62,11 +122,11 @@ int main(int argc, char *argv[])
     mesh.request_vertex_colors();
 
     OpenMesh::IO::Options opt = OpenMesh::IO::Options::VertexTexCoord;
-    if (!OpenMesh::IO::read_mesh(mesh, path, opt)) {
-        std::cerr << "failed to load mesh from " << path << std::endl;
+    if (!OpenMesh::IO::read_mesh(mesh, config.input_mesh_path, opt)) {
+        std::cerr << "failed to load mesh from " << config.input_mesh_path << std::endl;
         return 1;
     } else {
-        std::cout << fmt::format("succeed to load mesh from [{0}]", path) << std::endl;
+        std::cout << fmt::format("succeed to load mesh from [{0}]", config.input_mesh_path) << std::endl;
         PrintMeshInfo(mesh);
     }
 
@@ -87,14 +147,14 @@ int main(int argc, char *argv[])
     PointSamplingVertexBaker vertex_baker(mesh, tex);
     vertex_baker.Solve();
 
-    std::filesystem::create_directories("data/result/");
+    std::filesystem::create_directories(std::filesystem::path(config.output_mesh_path).parent_path());
     try {
 
-        if (!OpenMesh::IO::write_mesh(mesh, "data/result/openmesh.obj")) {
-            std::cerr << fmt::format("failed to write mesh to [{0}]", path) << std::endl;
+        if (!OpenMesh::IO::write_mesh(mesh, config.output_mesh_path)) {
+            std::cerr << fmt::format("failed to write mesh to [{0}]", config.output_mesh_path) << std::endl;
             return 1;
         } else {
-            std::cout << fmt::format("succeed to write mesh to [{0}]", path) << std::endl;
+            std::cout << fmt::format("succeed to write mesh to [{0}]", config.output_mesh_path) << std::endl;
         }
     } catch (std::exception& e) {
         std::cerr << fmt::format("failed to write mesh because [{0}]", e.what()) << std::endl;
@@ -117,7 +177,6 @@ int main(int argc, char *argv[])
         }
     }
 
-
     for (auto faceHandle : mesh.faces()) {
         auto fvIter = mesh.cfv_iter(faceHandle);
         for (int i = 0; i < 3; ++ i) {
@@ -127,7 +186,6 @@ int main(int argc, char *argv[])
         }
     }
 
-
     igl::opengl::glfw::Viewer viewer;
     igl::opengl::glfw::imgui::ImGuiPlugin plugin;
     igl::opengl::glfw::imgui::ImGuiMenu menu;
@@ -135,11 +193,11 @@ int main(int argc, char *argv[])
     plugin.widgets.push_back(&menu);
 
     bool debug_integral_method = false;
-    bool enable_random_sample = false;
-    bool enable_edge_regularization = false;
-    float regularization_factor = 0.1f;
-    int sample_num = 128;
-    int current_method = static_cast<int>(BakingMethod::PointSampling);
+    bool enable_random_sample = config.sampling_method == SamplingMethod::Random;
+    bool enable_edge_regularization = config.enable_edge_regularization;
+    float regularization_factor = config.regularization_factor;
+    int sample_num = config.sample_num;
+    int current_method = static_cast<int>(config.optimization_method);
     menu.callback_draw_viewer_menu = [&]() {
         menu.draw_viewer_menu();
 
@@ -170,14 +228,14 @@ int main(int argc, char *argv[])
 
         const char* items[] = {"Point Sampling", "Least Squares"};
         if (ImGui::Combo("method", &current_method, items, IM_ARRAYSIZE(items)) || regenerate_vertex_color) {
-            auto method = static_cast<BakingMethod>(current_method);
+            auto method = static_cast<OptimizationMethod>(current_method);
             std::unique_ptr<VertexBaker> vertex_baker;
             switch (method) {
-                case BakingMethod::PointSampling: {
+                case OptimizationMethod::PointSampling: {
                     vertex_baker = std::make_unique<PointSamplingVertexBaker>(mesh, tex);
                     break;
                 }
-                case BakingMethod::LeastSquares: {
+                case OptimizationMethod::LeastSquares: {
                     LeastSquaresVertexBaker::Options options;
                     options.debug_integral_method = debug_integral_method;
                     options.enable_random_sample = enable_random_sample;
