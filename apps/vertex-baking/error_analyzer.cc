@@ -41,6 +41,10 @@ float ErrorAnalyzer::AnalyzeFaceError(const Mesh::FaceHandle& fh)
         colors[i] = Eigen::Vector3f(color[0] / 255.0f, color[1] / 255.0f, color[2] / 255.0f);
     }
 
+    const auto v1_sub_v0 = mesh_.point(vhs[1]) - mesh_.point(vhs[0]);
+    const auto v2_sub_v0 = mesh_.point(vhs[2]) - mesh_.point(vhs[0]);
+    const auto normal_vec =  v1_sub_v0.cross(v2_sub_v0);
+    const auto triangle_area = 0.5f * normal_vec.norm();
 
     float sum_error = 0.0f;
     for (int i = 0; i < sample_num_; ++ i) {
@@ -53,7 +57,7 @@ float ErrorAnalyzer::AnalyzeFaceError(const Mesh::FaceHandle& fh)
 
         sum_error += (color_val - tex_val).squaredNorm();
     }
-    sum_error /= sample_num_;
+    sum_error = sum_error / triangle_area / sample_num_;
 
     return sum_error;
 }
