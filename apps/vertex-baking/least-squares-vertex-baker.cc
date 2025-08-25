@@ -268,7 +268,7 @@ std::vector<Eigen::Triplet<float>> LeastSquaresVertexBaker::BuildEdgeRegularizat
                 const auto rhs_vh = vhs[j];
 
                 const auto factor = area * options_.regularization_factor;
-                const auto val = factor * gradient_map[lhs_vh].dot(gradient_map[rhs_vh]) * area;
+                const auto val = factor * gradient_map[lhs_vh].dot(gradient_map[rhs_vh]);
                 triplets.emplace_back(lhs_vh.idx(), rhs_vh.idx(), val);
             }
         }
@@ -301,7 +301,8 @@ void LeastSquaresVertexBaker::ComputeVertexGradientInTriangle(const OpenMesh::Fa
 
         const auto edge_vec = vertex_infos[v2_idx].pos - vertex_infos[v1_idx].pos;
         auto gradient_v0 = normal_vec.cross(edge_vec);
-        gradient_v0 *= 1.0f / (4.0f * triangle_area);
+        gradient_v0 *= 1.0f / (4.0f * triangle_area * triangle_area);
+        gradient_v0 *= sqrt(triangle_area);
         
         vertex_infos[v0_idx].gradient = gradient_v0;
     }
