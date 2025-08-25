@@ -24,7 +24,7 @@ bool Texture::Load(const std::string& file_path)
     return true;
 }
 
-Eigen::Vector3f Texture::Sample(const Mesh::TexCoord2D& uv)
+Eigen::Vector3f Texture::Sample(const Mesh::TexCoord2D& uv) const
 {
     float s = std::fmod(uv[0], 1.0f) * static_cast<float>(width_);
     while (s < 0) {

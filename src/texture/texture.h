@@ -12,7 +12,7 @@ public:
     ~Texture();
 
     bool Load(const std::string& file_path);
-    Eigen::Vector3f Sample(const Mesh::TexCoord2D& uv);
+    Eigen::Vector3f Sample(const Mesh::TexCoord2D& uv) const;
 
 private:
     [[nodiscard]] Eigen::Vector3f GetPixel(int width, int height) const;
