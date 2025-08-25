@@ -3,7 +3,7 @@
 
 namespace meshlib {
 
-Eigen::Vector3f TriangleSampler::GenerateSamples(int sample_num)
+std::vector<BarycentricCoords> TriangleSampler::GenerateSamples(int sample_num)
 {
     std::vector<BarycentricCoords> barycentric_coords(sample_num);
 

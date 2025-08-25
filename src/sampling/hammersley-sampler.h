@@ -4,7 +4,7 @@
 
 namespace meshlib {
 
-double RadicalInverse(uint32_t bits)
+static double RadicalInverse(uint32_t bits)
 {
     bits = (bits << 16) | (bits >> 16);
     bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
