@@ -12,6 +12,7 @@
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
+#include "error_analyzer.h"
 #include "texture/texture.h"
 #include "point-sampling-vertex-baker.h"
 #include "least-squares-vertex-baker.h"
@@ -220,7 +221,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (ImGui::SliderInt("sample num", &sample_num, 4, 512)) {
+        if (ImGui::SliderInt("sample num", &sample_num, 4, 4 * 1024)) {
             regenerate_vertex_color = true;
         }
 
@@ -250,6 +251,11 @@ int main(int argc, char *argv[])
                 }
             }
             vertex_baker->Solve();
+
+            ErrorAnalyzer analyzer(mesh, tex, 1024);
+            const auto error = analyzer.Analyze();
+            spdlog::info("analyze error: {}", error);
+
             meshlib::MeshUtils::ConvertMeshToViewer(mesh, viewer);
             viewer.data().set_texture(R, G, B, A);
         }
